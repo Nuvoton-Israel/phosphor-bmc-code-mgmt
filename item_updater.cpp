@@ -136,6 +136,61 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
     return;
 }
 
+void ItemUpdater::processHostImage()
+{
+    using VersionClass = phosphor::software::manager::Version;
+
+    auto activationState = server::Activation::Activations::Active;
+    auto purpose = server::Version::VersionPurpose::Host;
+    auto biosRelease = fs::path(BIOS_FW_FILE);
+
+    if (!fs::is_regular_file(biosRelease))
+    {
+        log<level::ERR>("Failed to read biosRelease",
+                        entry("FILENAME=%s", biosRelease.string().c_str()));
+        return;
+    }
+
+    // Read bios-release from /usr/share/phosphor-bmc-code-mgmt to get the initial BIOS version
+    // The version may be chenaged by ipmi command, set system info.
+    auto initialVersion = VersionClass::getBMCVersion(biosRelease);
+    auto id = VersionClass::getId(initialVersion);
+    auto path = fs::path(SOFTWARE_OBJPATH) / id;
+    createFunctionalAssociation(path);
+
+    AssociationList associations = {};
+
+    // Create an association to the BMC inventory item
+    associations.emplace_back(std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
+                                              ACTIVATION_REV_ASSOCIATION,
+                                              hostInventoryPath));
+
+    // Create an active association since this image is active
+    createActiveAssociation(path);
+
+    // Create Version instance for this version.
+    auto versionPtr = std::make_unique<VersionClass>(
+        bus, path, initialVersion, purpose, "",
+        std::bind(&ItemUpdater::erase, this, std::placeholders::_1));
+
+    versions.insert(std::make_pair(id, std::move(versionPtr)));
+
+    // Create Activation instance for this version.
+    activations.insert(std::make_pair(
+        id, std::make_unique<Activation>(bus, path, *this, id, activationState,
+                                         associations)));
+
+    uint8_t priority = std::numeric_limits<uint8_t>::max();
+    if (!restoreFromFile(id, priority))
+        priority = 0;
+
+    activations.find(id)->second->redundancyPriority =
+        std::make_unique<RedundancyPriority>(
+            bus, path, *(activations.find(id)->second), priority, false);
+
+    return;
+}
+
 void ItemUpdater::processBMCImage()
 {
     using VersionClass = phosphor::software::manager::Version;
@@ -257,7 +312,7 @@ void ItemUpdater::processBMCImage()
 
     // If there is no ubi volume for bmc version then read the /etc/os-release
     // and create rofs-<versionId> under /media
-    if (activations.size() == 0)
+    if (activations.size() < 2)
     {
         auto version = VersionClass::getBMCVersion(OS_RELEASE_FILE);
         auto id = phosphor::software::manager::Version::getId(version);
@@ -480,6 +535,42 @@ void ItemUpdater::restoreFieldModeStatus()
         ItemUpdater::fieldModeEnabled(true);
     }
 }
+
+
+void ItemUpdater::setHostInventoryPath()
+{
+    auto depth = 0;
+    auto mapperCall = bus.new_method_call(MAPPER_BUSNAME, MAPPER_PATH,
+                                          MAPPER_INTERFACE, "GetSubTreePaths");
+
+    mapperCall.append(INVENTORY_PATH);
+    mapperCall.append(depth);
+    std::vector<std::string> filter = {"xyz.openbmc_project.Inventory.Item.System"};
+    mapperCall.append(filter);
+
+    try
+    {
+        auto response = bus.call(mapperCall);
+
+        using ObjectPaths = std::vector<std::string>;
+        ObjectPaths result;
+        response.read(result);
+
+        if (!result.empty())
+        {
+            bmcInventoryPath = result.front();
+        }
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::ERR>("Error in mapper GetSubTreePath");
+        return;
+    }
+
+    return;
+}
+
+
 
 void ItemUpdater::setBMCInventoryPath()
 {

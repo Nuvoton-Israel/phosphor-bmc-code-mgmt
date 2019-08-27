@@ -21,6 +21,9 @@ bin_PROGRAMS = \
 dist_bin_SCRIPTS = \
 	obmc-flash-bmc
 
+dist_pkgdata_DATA = \
+    bios-release
+
 phosphor_version_software_manager_SOURCES = \
 	image_manager_main.cpp \
 	watch.cpp \

@@ -58,6 +58,8 @@ class ItemUpdater : public ItemUpdaterInherit
     {
         setBMCInventoryPath();
         processBMCImage();
+        setHostInventoryPath();
+        processHostImage();
         restoreFieldModeStatus();
         emit_object_added();
     };
@@ -85,6 +87,11 @@ class ItemUpdater : public ItemUpdaterInherit
      * @brief Create and populate the active BMC Version.
      */
     void processBMCImage();
+
+    /**
+     * @brief Create and populate the active BIOS Version.
+     */
+    void processHostImage();
 
     /**
      * @brief Erase specified entry D-Bus object
@@ -185,8 +192,15 @@ class ItemUpdater : public ItemUpdaterInherit
      *  /xyz/openbmc_project/inventory/system/chassis/. */
     void setBMCInventoryPath();
 
+    /** @brief Sets the System inventory item path under
+     *  /xyz/openbmc_project/inventory/system/chassis/. */
+    void setHostInventoryPath();
+
     /** @brief The path to the BMC inventory item. */
     std::string bmcInventoryPath;
+
+    /** @brief The path to the System inventory item. */
+    std::string hostInventoryPath;
 
     /** @brief Restores field mode status on reboot. */
     void restoreFieldModeStatus();
