@@ -28,10 +28,26 @@ void Activation::flashWrite()
     // the image to flash during reboot.
     fs::path uploadDir(IMG_UPLOAD_DIR);
     fs::path toPath(PATH_INITRAMFS);
+
     for (auto& bmcImage : phosphor::software::image::bmcImages)
     {
-        fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
-                      fs::copy_options::overwrite_existing);
+        if ( fs::exists(uploadDir / versionId / bmcImage))
+        {
+            if(bmcImage.compare("image-bios")==0)
+            {
+                fs::copy_file(uploadDir / versionId / bmcImage, "/tmp/bios-image",
+                              fs::copy_options::overwrite_existing);
+
+                std::string serviceFile = "phosphor-ipmi-flash-bios-update.service";
+                auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
+                                      SYSTEMD_INTERFACE, "StartUnit");
+                method.append(serviceFile, "replace");
+                auto rerply = bus.call(method);
+            }
+            else
+                fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
+                              fs::copy_options::overwrite_existing);
+        }
     }
 }
 

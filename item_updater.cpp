@@ -64,7 +64,7 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
                     auto value = SVersion::convertVersionPurposeFromString(
                         variant_ns::get<std::string>(property.second));
                     if (value == VersionPurpose::BMC ||
-                        value == VersionPurpose::System)
+                        value == VersionPurpose::Host)
                     {
                         purpose = value;
                     }
@@ -343,7 +343,7 @@ void ItemUpdater::erase(std::string entryId)
     auto it = versions.find(entryId);
     if (it != versions.end())
     {
-        if (it->second->isFunctional() && ACTIVE_BMC_MAX_ALLOWED > 1)
+        if (it->second->isFunctional() && ACTIVE_BMC_MAX_ALLOWED >= 1)
         {
             log<level::ERR>("Error: Version is currently running on the BMC. "
                             "Unable to remove.",
@@ -411,18 +411,16 @@ void ItemUpdater::deleteAll()
 ItemUpdater::ActivationStatus
     ItemUpdater::validateSquashFSImage(const std::string& filePath)
 {
-    bool invalid = false;
+    bool invalid = true;
 
     for (auto& bmcImage : bmcImages)
     {
         fs::path file(filePath);
         file /= bmcImage;
         std::ifstream efile(file.c_str());
-        if (efile.good() != 1)
+        if (efile.good())
         {
-            log<level::ERR>("Failed to find the BMC image.",
-                            entry("IMAGE=%s", bmcImage.c_str()));
-            invalid = true;
+            invalid = false;
         }
     }
 

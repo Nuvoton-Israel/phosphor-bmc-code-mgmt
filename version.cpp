@@ -124,7 +124,12 @@ std::string Version::getBMCVersion(const std::string& releaseFilePath)
 
 bool Version::isFunctional()
 {
-    return versionStr == getBMCVersion(OS_RELEASE_FILE);
+    if(versionStr == getBMCVersion(OS_RELEASE_FILE))
+        return true;
+    else if(versionStr == getBMCVersion(BIOS_FW_FILE))
+        return true;
+    else
+        return false;
 }
 
 void Delete::delete_()

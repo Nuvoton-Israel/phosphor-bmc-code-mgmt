@@ -110,13 +110,17 @@ bool Signature::verify()
             fs::path sigFile(file);
             sigFile.replace_extension(SIGNATURE_FILE_EXT);
 
-            // Verify the signature.
-            auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
-            if (valid == false)
+            // Make sure the existence of the image file and sig file in the system.
+            if ( fs::exists(file) && fs::exists(sigFile) )
             {
-                log<level::ERR>("Image file Signature Validation failed",
-                                entry("IMAGE=%s", bmcImage.c_str()));
-                return false;
+                // Verify the signature.
+                auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
+                if (valid == false)
+                {
+                    log<level::ERR>("Image file Signature Validation failed",
+                                    entry("IMAGE=%s", bmcImage.c_str()));
+                    return false;
+                }
             }
         }
 
