@@ -4,6 +4,7 @@
 #include "item_updater_helper.hpp"
 #include "version.hpp"
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
+#include "xyz/openbmc_project/Software/Version/server.hpp"
 
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -27,6 +28,8 @@ namespace MatchRules = sdbusplus::bus::match::rules;
 using VersionClass = phosphor::software::manager::Version;
 using AssociationList =
     std::vector<std::tuple<std::string, std::string, std::string>>;
+
+namespace server = sdbusplus::xyz::openbmc_project::Software::server;
 
 /** @class ItemUpdater
  *  @brief Manages the activation of the BMC version items.
@@ -154,6 +157,7 @@ class ItemUpdater : public ItemUpdaterInherit
      * @param[in] caller - The Activation object that called this function.
      */
     void freeSpace(Activation& caller);
+    server::Version::VersionPurpose getVersionPurpose(const std::string& versionId);
 
   private:
     /** @brief Callback function for Software.Version match.
