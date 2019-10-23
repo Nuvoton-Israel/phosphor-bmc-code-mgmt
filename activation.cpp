@@ -208,7 +208,7 @@ auto Activation::activation(Activations value) -> Activations
         }
         else
         {
-		    log<level::INFO>("BMC image ready, need reboot to get activated.");
+            log<level::INFO>("BMC image ready, need reboot to get activated.");
         }
 
         return softwareServer::Activation::activation(
@@ -333,6 +333,12 @@ void ActivationBlocksTransition::disableRebootGuard()
 
 bool Activation::checkApplyTimeImmediate()
 {
+    auto purpose = parent.getVersionPurpose(versionId);
+    if (purpose != server::Version::VersionPurpose::BMC)
+    {
+        log<level::WARNING>("Only BMC image need apply");
+        return false;
+    }
     auto service = utils::getService(bus, applyTimeObjPath, applyTimeIntf);
     if (service.empty())
     {

@@ -5,7 +5,6 @@
 #include "images.hpp"
 #include "serialize.hpp"
 #include "version.hpp"
-#include "xyz/openbmc_project/Software/Version/server.hpp"
 
 #include <experimental/filesystem>
 #include <fstream>
@@ -34,12 +33,12 @@ using namespace sdbusplus::xyz::openbmc_project::Software::Image::Error;
 using namespace phosphor::software::image;
 namespace fs = std::experimental::filesystem;
 using NotAllowed = sdbusplus::xyz::openbmc_project::Common::Error::NotAllowed;
+using VersionPurpose = server::Version::VersionPurpose;
 
 void ItemUpdater::createActivation(sdbusplus::message::message& msg)
 {
 
     using SVersion = server::Version;
-    using VersionPurpose = SVersion::VersionPurpose;
     using VersionClass = phosphor::software::manager::Version;
     namespace mesg = sdbusplus::message;
     namespace variant_ns = mesg::variant_ns;
@@ -537,7 +536,6 @@ void ItemUpdater::restoreFieldModeStatus()
     std::system("rm /tmp/env");
 }
 
-
 void ItemUpdater::setHostInventoryPath()
 {
     auto depth = 0;
@@ -559,7 +557,7 @@ void ItemUpdater::setHostInventoryPath()
 
         if (!result.empty())
         {
-            bmcInventoryPath = result.front();
+            hostInventoryPath = result.front();
         }
     }
     catch (const sdbusplus::exception::SdBusError& e)
@@ -736,6 +734,25 @@ void ItemUpdater::freeSpace(Activation& caller)
 void ItemUpdater::mirrorUbootToAlt()
 {
     helper.mirrorAlt();
+}
+
+VersionPurpose ItemUpdater::getVersionPurpose(const std::string& versionId)
+{
+    auto iter = versions.find(versionId);
+    if (iter != versions.end())
+    {
+        auto _purpose = iter->second->purpose();
+        std::string _purpose_str = server::convertForMessage(_purpose);
+        log<level::DEBUG>(("version purpose:" + _purpose_str).c_str(),
+                            entry("VERSIONID=%s", versionId.c_str()));
+        return _purpose;
+    }
+    else
+    {
+        log<level::ERR>("Error in get version purpose, no such id",
+                        entry("VERSIONID=%s", versionId.c_str()));
+    }
+    return VersionPurpose::Unknown;
 }
 
 } // namespace updater
