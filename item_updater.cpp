@@ -261,7 +261,6 @@ void ItemUpdater::processBMCImage()
                 associations.emplace_back(std::make_tuple(
                     ACTIVATION_FWD_ASSOCIATION, ACTIVATION_REV_ASSOCIATION,
                     bmcInventoryPath));
-
                 // Create an active association since this image is active
                 createActiveAssociation(path);
             }
@@ -342,7 +341,7 @@ void ItemUpdater::erase(std::string entryId)
     auto it = versions.find(entryId);
     if (it != versions.end())
     {
-        if (it->second->isFunctional() && ACTIVE_BMC_MAX_ALLOWED >= 1)
+        if (it->second->isFunctional() && ACTIVE_BMC_MAX_ALLOWED > 1)
         {
             log<level::ERR>("Error: Version is currently running on the BMC. "
                             "Unable to remove.",
@@ -703,7 +702,11 @@ void ItemUpdater::freeSpace(Activation& caller)
             if ((versions.find(iter.second->versionId)
                      ->second->isFunctional() &&
                  ACTIVE_BMC_MAX_ALLOWED > 1) ||
-                (iter.second->versionId == caller.versionId))
+                (iter.second->versionId == caller.versionId) ||
+                 (versions.find(iter.second->versionId)
+                     ->second->purpose() == server::Version::VersionPurpose::BMC &&
+                 versions.find(iter.second->versionId)
+                     ->second->isFunctional()))
             {
                 continue;
             }

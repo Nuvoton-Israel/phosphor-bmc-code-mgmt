@@ -199,6 +199,12 @@ auto Activation::activation(Activations value) -> Activations
 
         // Create active association
         parent.createActiveAssociation(path);
+        auto purpose = parent.getVersionPurpose(versionId);
+        if (purpose != server::Version::VersionPurpose::BMC)
+        {
+            log<level::WARNING>("Only BIOS image need to create FunctionaAssociation");
+            parent.createFunctionalAssociation(path);
+        }
 
         if (Activation::checkApplyTimeImmediate() == true)
         {
