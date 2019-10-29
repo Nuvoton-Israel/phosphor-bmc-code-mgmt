@@ -116,6 +116,13 @@ class ItemUpdater : public ItemUpdaterInherit
      */
     void createActiveAssociation(const std::string& path);
 
+    /** @brief Creates a functional association to the
+     *  "running" BMC software image
+     *
+     * @param[in]  path - The path to create the association to.
+     */
+    void createFunctionalAssociation(const std::string& path);
+
     /** @brief Removes the associations from the provided software image path
      *
      * @param[in]  path - The path to remove the associations from.
@@ -208,13 +215,6 @@ class ItemUpdater : public ItemUpdaterInherit
 
     /** @brief Restores field mode status on reboot. */
     void restoreFieldModeStatus();
-
-    /** @brief Creates a functional association to the
-     *  "running" BMC software image
-     *
-     * @param[in]  path - The path to create the association to.
-     */
-    void createFunctionalAssociation(const std::string& path);
 
     /** @brief Persistent sdbusplus D-Bus bus connection. */
     sdbusplus::bus::bus& bus;
