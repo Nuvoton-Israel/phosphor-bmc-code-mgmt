@@ -6,6 +6,7 @@
 #include "images.hpp"
 
 #include <experimental/filesystem>
+#include <phosphor-logging/log.hpp>
 
 namespace
 {
@@ -18,7 +19,7 @@ namespace software
 {
 namespace updater
 {
-
+using namespace phosphor::logging;
 namespace fs = std::experimental::filesystem;
 
 void Activation::flashWrite()
@@ -42,7 +43,15 @@ void Activation::flashWrite()
                 auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
                                       SYSTEMD_INTERFACE, "StartUnit");
                 method.append(serviceFile, "replace");
-                auto rerply = bus.call(method);
+                try
+                {
+                    auto reply = bus.call(method);
+                }
+                catch(const std::exception& e)
+                {
+                    log<level::ERR>("Error in starting flash bios service",
+                        entry("WHAT=%s", e.what()));
+                }
             }
             else
                 fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,

@@ -137,10 +137,6 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
 
 void ItemUpdater::processHostImage()
 {
-    using VersionClass = phosphor::software::manager::Version;
-
-    auto activationState = server::Activation::Activations::Active;
-    auto purpose = server::Version::VersionPurpose::Host;
     auto biosRelease = fs::path(BIOS_FW_FILE);
 
     if (!fs::is_regular_file(biosRelease))
@@ -153,13 +149,29 @@ void ItemUpdater::processHostImage()
     // Read bios-release from /usr/share/phosphor-bmc-code-mgmt to get the initial BIOS version
     // The version may be chenaged by ipmi command, set system info.
     auto initialVersion = VersionClass::getBMCVersion(biosRelease);
-    auto id = VersionClass::getId(initialVersion);
+    if (initialVersion != INVALID_VERSION)
+    {
+        createHostVersion(initialVersion);
+    }
+    else
+    {
+        log<level::INFO>("Invalid version, skip create host version!");
+    }
+}
+
+void ItemUpdater::createHostVersion(const std::string& version)
+{
+    using VersionClass = phosphor::software::manager::Version;
+
+    auto activationState = server::Activation::Activations::Active;
+    auto purpose = server::Version::VersionPurpose::Host;
+    auto id = VersionClass::getId(version);
     auto path = fs::path(SOFTWARE_OBJPATH) / id;
     createFunctionalAssociation(path);
 
     AssociationList associations = {};
 
-    // Create an association to the BMC inventory item
+    // Create an association to the system inventory item
     associations.emplace_back(std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
                                               ACTIVATION_REV_ASSOCIATION,
                                               hostInventoryPath));
@@ -169,7 +181,7 @@ void ItemUpdater::processHostImage()
 
     // Create Version instance for this version.
     auto versionPtr = std::make_unique<VersionClass>(
-        bus, path, initialVersion, purpose, "",
+        bus, path, version, purpose, "",
         std::bind(&ItemUpdater::erase, this, std::placeholders::_1));
 
     versions.insert(std::make_pair(id, std::move(versionPtr)));
@@ -561,7 +573,7 @@ void ItemUpdater::setHostInventoryPath()
     }
     catch (const sdbusplus::exception::SdBusError& e)
     {
-        log<level::ERR>("Error in mapper GetSubTreePath");
+        log<level::ERR>("Error in mapper host GetSubTreePath");
         return;
     }
 
@@ -756,6 +768,72 @@ VersionPurpose ItemUpdater::getVersionPurpose(const std::string& versionId)
                         entry("VERSIONID=%s", versionId.c_str()));
     }
     return VersionPurpose::Unknown;
+}
+
+void ItemUpdater::updateHostVer(std::string version)
+{
+    if (version.empty())
+    {
+        log<level::ERR>("Host version must contains data");
+        return;
+    }
+    auto _found = false;
+    std::string _orig_id;
+    // we must find from activations, only activation contains versionId data
+    for (const auto& iter : activations)
+    {
+        auto _activation = iter.second->activation();
+        if (_activation == server::Activation::Activations::Active)
+        {
+            auto _version = versions.find(iter.second->versionId);
+            // cannot find mapping version
+            if (_version == versions.end())
+            {
+                log<level::ERR>("Cannot find mapping version data",
+                    entry("VERSIONID=%s", iter.second->versionId.c_str()));
+                continue;
+            }
+            if (_version->second->purpose() == VersionPurpose::Host)
+            {
+                _found = true;
+                // handle update version
+                // now exist an object purpose==host, activation==active
+                // check current version is match version id or not
+                // this case should only exist at update BIOS from host
+                auto _verId = VersionClass::getId(version);
+                if (_verId != iter.second->versionId)
+                {
+                    // delete old version, then create new one
+                    _orig_id = iter.second->versionId;
+                    _found = false;
+                    log<level::WARNING>("Error: Host version is not matched "
+                        "currently running version id.",
+                        entry("VERSIONID=%s", _orig_id.c_str()));
+                }
+                else
+                {
+                    log<level::INFO>(("Already get version: " + version).c_str());
+                }
+
+                break;
+            }
+        }
+    }
+    // handle delete version
+    if(!_orig_id.empty())
+    {
+        this->activations.erase(_orig_id);
+        this->versions.erase(_orig_id);
+    }
+
+    // handle create version
+    if (!_found)
+    {
+        // create host version
+        createHostVersion(version);
+        log<level::NOTICE >("created host version",
+            entry("VERSION=%s", version.c_str()));
+    }
 }
 
 } // namespace updater
