@@ -32,8 +32,11 @@ phosphor_version_software_manager_SOURCES = \
 
 BUILT_SOURCES = \
 	xyz/openbmc_project/Software/Image/error.cpp \
-	xyz/openbmc_project/Software/Image/error.hpp
+	xyz/openbmc_project/Software/Image/error.hpp \
+	xyz/openbmc_project/Software/HostVer/server.cpp \
+	xyz/openbmc_project/Software/HostVer/server.hpp
 
+nodist_include_HEADERS = xyz/openbmc_project/Software/HostVer/server.hpp
 CLEANFILES = ${BUILT_SOURCES}
 
 phosphor_download_manager_SOURCES = \
@@ -46,7 +49,8 @@ phosphor_image_updater_SOURCES = \
 	serialize.cpp \
 	item_updater.cpp \
 	item_updater_main.cpp \
-	utils.cpp
+	utils.cpp \
+	xyz/openbmc_project/Software/HostVer/server.cpp
 
 if HAVE_SYSTEMD
 systemdsystemunit_DATA = \
@@ -113,6 +117,14 @@ xyz/openbmc_project/Software/Image/error.hpp: ${top_srcdir}/xyz/openbmc_project/
 xyz/openbmc_project/Software/Image/error.cpp: ${top_srcdir}/xyz/openbmc_project/Software/Image.errors.yaml
 	@mkdir -p `dirname $@`
 	$(SDBUSPLUSPLUS) -r $(srcdir) error exception-cpp xyz.openbmc_project.Software.Image > $@
+
+xyz/openbmc_project/Software/HostVer/server.cpp: ${top_srcdir}/xyz/openbmc_project/Software/HostVer.interface.yaml
+	@mkdir -p `dirname $@`
+	$(SDBUSPLUSPLUS) -r $(top_srcdir) interface server-cpp xyz.openbmc_project.Software.HostVer > $@
+
+xyz/openbmc_project/Software/HostVer/server.hpp: ${top_srcdir}/xyz/openbmc_project/Software/HostVer.interface.yaml
+	@mkdir -p `dirname $@`
+	$(SDBUSPLUSPLUS) -r $(top_srcdir) interface server-header xyz.openbmc_project.Software.HostVer > $@
 
 phosphor_version_software_manager_CXXFLAGS = $(generic_cxxflags)
 phosphor_version_software_manager_LDFLAGS = $(generic_ldflags)

@@ -1,0 +1,11 @@
+description: >
+    Implement to update BIOS version from ipmid.
+methods:
+    - name: UpdateHostVer
+      description: >
+          Create or update host version
+      parameters:
+        - name: version
+          type: string
+          description: >
+              version from ipmid

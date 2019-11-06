@@ -5,6 +5,7 @@
 #include "version.hpp"
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/Software/Version/server.hpp"
+#include "xyz/openbmc_project/Software/HostVer/server.hpp"
 
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -22,12 +23,15 @@ using ItemUpdaterInherit = sdbusplus::server::object::object<
     sdbusplus::xyz::openbmc_project::Common::server::FactoryReset,
     sdbusplus::xyz::openbmc_project::Control::server::FieldMode,
     sdbusplus::xyz::openbmc_project::Association::server::Definitions,
-    sdbusplus::xyz::openbmc_project::Collection::server::DeleteAll>;
+    sdbusplus::xyz::openbmc_project::Collection::server::DeleteAll,
+    sdbusplus::xyz::openbmc_project::Software::server::HostVer>;
 
 namespace MatchRules = sdbusplus::bus::match::rules;
 using VersionClass = phosphor::software::manager::Version;
 using AssociationList =
     std::vector<std::tuple<std::string, std::string, std::string>>;
+
+constexpr auto INVALID_VERSION = "N/A";
 
 namespace server = sdbusplus::xyz::openbmc_project::Software::server;
 
@@ -164,7 +168,14 @@ class ItemUpdater : public ItemUpdaterInherit
      * @param[in] caller - The Activation object that called this function.
      */
     void freeSpace(Activation& caller);
+
+    /** @brief Find the version purpose by version ID
+     *
+     * @param[in] versionId  - the purpose mapping version ID
+     */
     server::Version::VersionPurpose getVersionPurpose(const std::string& versionId);
+    void updateHostVer(std::string) override;
+
 
   private:
     /** @brief Callback function for Software.Version match.
@@ -247,6 +258,7 @@ class ItemUpdater : public ItemUpdaterInherit
      *  alternate chip.
      */
     void mirrorUbootToAlt();
+    void createHostVersion(const std::string& version);
 };
 
 } // namespace updater
