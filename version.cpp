@@ -51,6 +51,12 @@ std::string Version::getValue(const std::string& manifestFilePath,
         efile.open(manifestFilePath);
         while (getline(efile, line))
         {
+            if (!line.empty() && line.back() == '\r')
+            {
+                // If the manifest has CRLF line terminators, e.g. is created on
+                // Windows, the line will contain \r at the end, remove it.
+                line.pop_back();
+            }
             if (line.compare(0, keySize, key) == 0)
             {
                 value = line.substr(keySize);
@@ -91,6 +97,33 @@ std::string Version::getId(const std::string& version)
     // Only need 8 hex digits.
     std::string hexId = std::string(mdString);
     return (hexId.substr(0, 8));
+}
+
+std::string Version::getBMCMachine(const std::string& releaseFilePath)
+{
+    std::string machineKey = "OPENBMC_TARGET_MACHINE=";
+    std::string machine{};
+    std::ifstream efile(releaseFilePath);
+    std::string line;
+
+    while (getline(efile, line))
+    {
+        if (line.substr(0, machineKey.size()).find(machineKey) !=
+            std::string::npos)
+        {
+            std::size_t pos = line.find_first_of('"') + 1;
+            machine = line.substr(pos, line.find_last_of('"') - pos);
+            break;
+        }
+    }
+
+    if (machine.empty())
+    {
+        log<level::ERR>("Unable to find OPENBMC_TARGET_MACHINE");
+        elog<InternalFailure>();
+    }
+
+    return machine;
 }
 
 std::string Version::getBMCVersion(const std::string& releaseFilePath)
