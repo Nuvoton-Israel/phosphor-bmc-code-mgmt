@@ -114,15 +114,33 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
         {
             activationState = server::Activation::Activations::Ready;
             // Create an association to the BMC inventory item
+            std::string _inventoryPath;
+            if (purpose == VersionPurpose::Host)
+            {
+                _inventoryPath = hostInventoryPath;
+            }
+            else
+            {
+                _inventoryPath = bmcInventoryPath;
+            }
             associations.emplace_back(
                 std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
-                                ACTIVATION_REV_ASSOCIATION, bmcInventoryPath));
+                                ACTIVATION_REV_ASSOCIATION, _inventoryPath));
         }
 
-        activations.insert(std::make_pair(
-            versionId,
-            std::make_unique<Activation>(bus, path, *this, versionId,
-                                         activationState, associations)));
+        std::unique_ptr<Activation> activationPtr;
+        if (purpose == VersionPurpose::Host)
+        {
+            activationPtr = std::make_unique<HostActivation>(bus, path,
+                        *this, versionId, activationState, associations);
+        }
+        else
+        {
+            activationPtr = std::make_unique<Activation>(bus, path,
+                        *this, versionId, activationState, associations);
+        }
+
+        activations.insert(std::make_pair(versionId, std::move(activationPtr)));
 
         auto versionPtr = std::make_unique<VersionClass>(
             bus, path, version, purpose, filePath,
@@ -188,8 +206,8 @@ void ItemUpdater::createHostVersion(const std::string& version)
 
     // Create Activation instance for this version.
     activations.insert(std::make_pair(
-        id, std::make_unique<Activation>(bus, path, *this, id, activationState,
-                                         associations)));
+        id, std::make_unique<HostActivation>(bus, path, *this, id,
+                                    activationState, associations)));
 
     uint8_t priority = std::numeric_limits<uint8_t>::max();
     if (!restoreFromFile(id, priority))
@@ -597,7 +615,6 @@ void ItemUpdater::setHostInventoryPath()
 }
 
 
-
 void ItemUpdater::setBMCInventoryPath()
 {
     auto depth = 0;
@@ -714,6 +731,7 @@ void ItemUpdater::freeSpace(Activation& caller)
         versionsPQ;
 
     std::size_t count = 0;
+    auto caller_purpose = versions.find(caller.versionId)->second.get()->purpose();
     for (const auto& iter : activations)
     {
         if ((iter.second.get()->activation() ==
@@ -730,11 +748,13 @@ void ItemUpdater::freeSpace(Activation& caller)
             if ((versions.find(iter.second->versionId)
                      ->second->isFunctional() &&
                  ACTIVE_BMC_MAX_ALLOWED > 1) ||
-                (iter.second->versionId == caller.versionId) ||
-                 (versions.find(iter.second->versionId)
-                     ->second->purpose() == server::Version::VersionPurpose::BMC &&
-                 versions.find(iter.second->versionId)
-                     ->second->isFunctional()))
+                (iter.second->versionId == caller.versionId))
+            {
+                continue;
+            }
+            // Do not free different purpose image
+            if (caller_purpose != versions.find(iter.second->versionId)
+                    ->second.get()->purpose())
             {
                 continue;
             }
@@ -767,25 +787,6 @@ void ItemUpdater::mirrorUbootToAlt()
     helper.mirrorAlt();
 }
 
-VersionPurpose ItemUpdater::getVersionPurpose(const std::string& versionId)
-{
-    auto iter = versions.find(versionId);
-    if (iter != versions.end())
-    {
-        auto _purpose = iter->second->purpose();
-        std::string _purpose_str = server::convertForMessage(_purpose);
-        log<level::DEBUG>(("version purpose:" + _purpose_str).c_str(),
-                            entry("VERSIONID=%s", versionId.c_str()));
-        return _purpose;
-    }
-    else
-    {
-        log<level::ERR>("Error in get version purpose, no such id",
-                        entry("VERSIONID=%s", versionId.c_str()));
-    }
-    return VersionPurpose::Unknown;
-}
-
 void ItemUpdater::updateHostVer(std::string version)
 {
     if (version.empty())
@@ -793,6 +794,7 @@ void ItemUpdater::updateHostVer(std::string version)
         log<level::ERR>("Host version must contains data");
         return;
     }
+    log<level::INFO>(("Try to update host version: " + version).c_str());
     auto _found = false;
     std::string _orig_id;
     // we must find from activations, only activation contains versionId data
@@ -825,6 +827,8 @@ void ItemUpdater::updateHostVer(std::string version)
                     log<level::WARNING>("Error: Host version is not matched "
                         "currently running version id.",
                         entry("VERSIONID=%s", _orig_id.c_str()));
+                    // also clear associations if need clear activations object
+                    removeAssociations(iter.second->path);
                 }
                 else
                 {
@@ -847,8 +851,7 @@ void ItemUpdater::updateHostVer(std::string version)
     {
         // create host version
         createHostVersion(version);
-        log<level::NOTICE >("created host version",
-            entry("VERSION=%s", version.c_str()));
+        log<level::INFO >(("created host version" + version).c_str());
     }
 }
 

@@ -169,12 +169,11 @@ class ItemUpdater : public ItemUpdaterInherit
      */
     void freeSpace(Activation& caller);
 
-    /** @brief Find the version purpose by version ID
+    /** @brief Update or create BIOS version object
      *
-     * @param[in] versionId  - the purpose mapping version ID
+     * @param[in] version  - the version of BIOS
      */
-    server::Version::VersionPurpose getVersionPurpose(const std::string& versionId);
-    void updateHostVer(std::string) override;
+    void updateHostVer(std::string version) override;
 
 
   private:
@@ -258,6 +257,12 @@ class ItemUpdater : public ItemUpdaterInherit
      *  alternate chip.
      */
     void mirrorUbootToAlt();
+
+    /** @brief Update or create new BIOS version and activation D-Bus
+     * object from input version.
+     *
+     * @param[in]  value  - The real BIOS version from IPMI daemon.
+     */
     void createHostVersion(const std::string& version);
 };
 

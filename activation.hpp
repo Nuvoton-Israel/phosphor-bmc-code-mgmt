@@ -11,6 +11,7 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Software/Activation/server.hpp>
 #include <xyz/openbmc_project/Software/ActivationBlocksTransition/server.hpp>
+#include <phosphor-logging/log.hpp>
 
 #ifdef WANT_SIGNATURE_VERIFY
 #include <experimental/filesystem>
@@ -22,7 +23,7 @@ namespace software
 {
 namespace updater
 {
-
+using namespace phosphor::logging;
 #ifdef WANT_SIGNATURE_VERIFY
 namespace fs = std::experimental::filesystem;
 #endif
@@ -355,7 +356,7 @@ class Activation : public ActivationInherit, public Flash
     bool ubootEnvVarsUpdated = false;
 
 #ifdef WANT_SIGNATURE_VERIFY
-  private:
+  protected:
     /** @brief Verify signature of the images.
      *
      * @param[in] imageDir - The path of images to verify
@@ -368,6 +369,56 @@ class Activation : public ActivationInherit, public Flash
     /** @brief Called when image verification fails. */
     void onVerifyFailed();
 #endif
+};
+
+class HostActivation : public Activation
+{
+    public:
+    static constexpr auto flashBiosServiceFile =
+            "phosphor-ipmi-flash-bios-update.service";
+
+    // same constructor with Activation
+    /** @brief Constructs Activation Software Manager
+     *
+     * @param[in] bus    - The Dbus bus object
+     * @param[in] path   - The Dbus object path
+     * @param[in] parent - Parent object.
+     * @param[in] versionId  - The software version id
+     * @param[in] activationStatus - The status of Activation
+     * @param[in] assocs - Association objects
+     */
+    HostActivation(sdbusplus::bus::bus& bus, const std::string& path,
+               ItemUpdater& parent, std::string& versionId,
+               sdbusplus::xyz::openbmc_project::Software::server::Activation::
+               Activations activationStatus, AssociationList& assocs) :
+               Activation(bus, path, parent, versionId, activationStatus, assocs)
+    {
+        log<level::DEBUG>("HostActivation::constructor");
+        biosFlashed = false;
+    }
+    // NOTE: below override functions already declare as virtual function,
+    //       in base class, so we don't need change more things.
+
+    /** @brief Overloaded Activation property setter function
+     *
+     * @param[in] value - One of Activation::Activations
+     *
+     * @return Success or exception thrown
+     */
+    Activations activation(Activations value) override;
+
+    /** @brief Activation */
+    using ActivationInherit::activation;
+
+    /** @brief Overloaded write flash function */
+    void flashWrite() override;
+
+    /** @brief Overloaded function that acts on service file state changes */
+    void onStateChanges(sdbusplus::message::message&) override;
+
+    private:
+    /** @brief Trace if the service that upgrade BIOS has done. */
+    bool biosFlashed = false;
 };
 
 } // namespace updater
