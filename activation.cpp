@@ -6,7 +6,6 @@
 
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
-#include <phosphor-logging/log.hpp>
 #include <sdbusplus/exception.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 
@@ -199,12 +198,6 @@ auto Activation::activation(Activations value) -> Activations
 
         // Create active association
         parent.createActiveAssociation(path);
-        auto purpose = parent.getVersionPurpose(versionId);
-        if (purpose != server::Version::VersionPurpose::BMC)
-        {
-            log<level::WARNING>("Only BIOS image need to create FunctionaAssociation");
-            parent.createFunctionalAssociation(path);
-        }
 
         if (Activation::checkApplyTimeImmediate() == true)
         {
@@ -225,6 +218,87 @@ auto Activation::activation(Activations value) -> Activations
     {
         activationBlocksTransition.reset(nullptr);
         activationProgress.reset(nullptr);
+    }
+    return softwareServer::Activation::activation(value);
+}
+
+auto HostActivation::activation(Activations value) -> Activations
+{
+    log<level::DEBUG>(("HostActivation::activation value:" + convertForMessage(value)).c_str());
+    if ((value != softwareServer::Activation::Activations::Active) &&
+        (value != softwareServer::Activation::Activations::Activating))
+    {
+        redundancyPriority.reset(nullptr);
+    }
+
+    if (value == softwareServer::Activation::Activations::Activating)
+    {
+        if (biosFlashed == false)
+        {
+#ifdef WANT_SIGNATURE_VERIFY
+            fs::path uploadDir(IMG_UPLOAD_DIR);
+            if (!verifySignature(uploadDir / versionId, SIGNED_IMAGE_CONF_PATH))
+            {
+                onVerifyFailed();
+                // Stop the activation process, if fieldMode is enabled.
+                if (parent.control::FieldMode::fieldModeEnabled())
+                {
+                    return softwareServer::Activation::activation(
+                        softwareServer::Activation::Activations::Failed);
+                }
+            }
+#endif
+            // Enable systemd signals
+            Activation::subscribeToSystemdSignals();
+
+            parent.freeSpace(*this);
+
+            if (!activationProgress)
+            {
+                activationProgress =
+                    std::make_unique<ActivationProgress>(bus, path);
+            }
+
+            if (!activationBlocksTransition)
+            {
+                activationBlocksTransition =
+                    std::make_unique<ActivationBlocksTransition>(bus, path);
+            }
+            activationProgress->progress(10);
+            flashWrite();
+            activationProgress->progress(30);
+        }
+        else // BIOS writed
+        {
+            // update BIOS update status
+            if (!redundancyPriority)
+            {
+                redundancyPriority =
+                    std::make_unique<RedundancyPriority>(bus, path, *this, 0);
+            }
+            activationProgress->progress(100);
+
+            activationBlocksTransition.reset(nullptr);
+            activationProgress.reset(nullptr);
+
+            this->biosFlashed = false;
+            Activation::unsubscribeFromSystemdSignals();
+            // Remove version object from image manager
+            Activation::deleteImageManagerObject();
+            // Create active association
+            parent.createActiveAssociation(path);
+            // Only BIOS image need to create FunctionaAssociation
+            // because BIOS already updated
+            parent.createFunctionalAssociation(path);
+            return softwareServer::Activation::activation(
+                softwareServer::Activation::Activations::Active);
+        }
+    }
+    else // activation() != Activating
+    {
+        activationBlocksTransition.reset(nullptr);
+        activationProgress.reset(nullptr);
+        this->biosFlashed = false;
     }
     return softwareServer::Activation::activation(value);
 }
@@ -263,7 +337,8 @@ auto Activation::requestedActivation(RequestedActivations value)
             (softwareServer::Activation::activation() ==
              softwareServer::Activation::Activations::Failed))
         {
-            Activation::activation(
+            // using dynamic binding instead of call Activation::activation()
+            this->activation(
                 softwareServer::Activation::Activations::Activating);
         }
     }
@@ -339,12 +414,6 @@ void ActivationBlocksTransition::disableRebootGuard()
 
 bool Activation::checkApplyTimeImmediate()
 {
-    auto purpose = parent.getVersionPurpose(versionId);
-    if (purpose != server::Version::VersionPurpose::BMC)
-    {
-        log<level::WARNING>("Only BMC image need apply");
-        return false;
-    }
     auto service = utils::getService(bus, applyTimeObjPath, applyTimeIntf);
     if (service.empty())
     {
