@@ -758,6 +758,12 @@ void ItemUpdater::freeSpace(Activation& caller)
             {
                 continue;
             }
+            // keep BMC functional image after active new image for automatic test
+            if (caller_purpose == VersionPurpose::BMC &&
+                    versions.find(iter.second->versionId)->second->isFunctional())
+            {
+                continue;
+            }
 
             // Failed activations don't have priority, assign them a large value
             // for sorting purposes.
