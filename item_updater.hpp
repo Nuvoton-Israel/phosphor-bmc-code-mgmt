@@ -175,6 +175,9 @@ class ItemUpdater : public ItemUpdaterInherit
      */
     void updateHostVer(std::string version) override;
 
+    /** @brief Persistent map of Version D-Bus objects and their
+     * version id */
+    std::map<std::string, std::unique_ptr<VersionClass>> versions;
 
   private:
     /** @brief Callback function for Software.Version match.
@@ -235,10 +238,6 @@ class ItemUpdater : public ItemUpdaterInherit
     /** @brief Persistent map of Activation D-Bus objects and their
      * version id */
     std::map<std::string, std::unique_ptr<Activation>> activations;
-
-    /** @brief Persistent map of Version D-Bus objects and their
-     * version id */
-    std::map<std::string, std::unique_ptr<VersionClass>> versions;
 
     /** @brief sdbusplus signal match for Software.Version */
     sdbusplus::bus::match_t versionMatch;

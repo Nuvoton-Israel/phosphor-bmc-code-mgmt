@@ -210,7 +210,7 @@ void ItemUpdater::createHostVersion(const std::string& version)
                                     activationState, associations)));
 
     uint8_t priority = std::numeric_limits<uint8_t>::max();
-    if (!restoreFromFile(id, priority))
+    if (!restorePriority(id, priority))
         priority = 0;
 
     activations.find(id)->second->redundancyPriority =
@@ -274,6 +274,8 @@ void ItemUpdater::processBMCImage()
             }
 
             auto purpose = server::Version::VersionPurpose::BMC;
+            restorePurpose(id, purpose);
+
             auto path = fs::path(SOFTWARE_OBJPATH) / id;
 
             // Create functional association if this is the functional
@@ -318,7 +320,7 @@ void ItemUpdater::processBMCImage()
             if (activationState == server::Activation::Activations::Active)
             {
                 uint8_t priority = std::numeric_limits<uint8_t>::max();
-                if (!restoreFromFile(id, priority))
+                if (!restorePriority(id, priority))
                 {
                     if (isVersionFunctional)
                     {
@@ -381,7 +383,7 @@ void ItemUpdater::erase(std::string entryId)
 
         // Delete ReadOnly partitions if it's not active
         removeReadOnlyPartition(entryId);
-        removeFile(entryId);
+        removePersistDataDirectory(entryId);
 
         // Removing entry in versions map
         this->versions.erase(entryId);
@@ -390,7 +392,7 @@ void ItemUpdater::erase(std::string entryId)
     {
         // Delete ReadOnly partitions even if we can't find the version
         removeReadOnlyPartition(entryId);
-        removeFile(entryId);
+        removePersistDataDirectory(entryId);
 
         log<level::ERR>("Error: Failed to find version in item updater "
                         "versions map. Unable to remove.",
@@ -462,7 +464,7 @@ ItemUpdater::ActivationStatus
 
 void ItemUpdater::savePriority(const std::string& versionId, uint8_t value)
 {
-    storeToFile(versionId, value);
+    storePriority(versionId, value);
     helper.setEntry(versionId, value);
 }
 

@@ -2,6 +2,8 @@
 
 #include "config.h"
 
+#include "version.hpp"
+
 #include <experimental/filesystem>
 
 namespace phosphor
@@ -12,24 +14,39 @@ namespace updater
 {
 
 namespace fs = std::experimental::filesystem;
+using VersionPurpose =
+    sdbusplus::xyz::openbmc_project::Software::server::Version::VersionPurpose;
 
-/** @brief Serialization function - stores activation information to file
+/** @brief Serialization function - stores priority information to file
  *  @param[in] versionId - The version for which to store information.
  *  @param[in] priority - RedundancyPriority value for that version.
  **/
-void storeToFile(std::string versionId, uint8_t priority);
+void storePriority(const std::string& versionId, uint8_t priority);
 
-/** @brief Serialization function - restores activation information from file
+/** @brief Serialization function - stores purpose information to file
+ *  @param[in] versionId - The version for which to store information.
+ *  @param[in] purpose - VersionPurpose value for that version.
+ **/
+void storePurpose(const std::string& versionId, VersionPurpose purpose);
+
+/** @brief Serialization function - restores priority information from file
  *  @param[in] versionId - The version for which to retrieve information.
  *  @param[in] priority - RedundancyPriority reference for that version.
  *  @return true if restore was successful, false if not
  **/
-bool restoreFromFile(std::string versionId, uint8_t& priority);
+bool restorePriority(const std::string& versionId, uint8_t& priority);
 
-/** @brief Removes the serial file for a given version.
+/** @brief Serialization function - restores purpose information from file
+ *  @param[in] versionId - The version for which to retrieve information.
+ *  @param[in] purpose - VersionPurpose reference for that version.
+ *  @return true if restore was successful, false if not
+ **/
+bool restorePurpose(const std::string& versionId, VersionPurpose& purpose);
+
+/** @brief Removes the serial directory for a given version.
  *  @param[in] versionId - The version for which to remove a file, if it exists.
  **/
-void removeFile(std::string versionId);
+void removePersistDataDirectory(const std::string& versionId);
 
 } // namespace updater
 } // namespace software
