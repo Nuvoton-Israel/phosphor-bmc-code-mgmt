@@ -122,6 +122,12 @@ bool Signature::verify()
                     return false;
                 }
             }
+            else if ( fs::exists(file) && ! fs::exists(sigFile) )
+            {
+                log<level::ERR>("Image file Signature is not exist",
+                                entry("IMAGE=%s", bmcImage.c_str()));
+                return false;
+            }
         }
 
         log<level::DEBUG>("Successfully completed Signature vaildation.");

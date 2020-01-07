@@ -27,6 +27,7 @@ using namespace phosphor::logging;
 using InternalFailure =
     sdbusplus::xyz::openbmc_project::Common::Error::InternalFailure;
 namespace fs = std::experimental::filesystem;
+auto constexpr FULL_IMAGE = "image-bmc";
 
 void Activation::flashWrite()
 {
@@ -36,6 +37,12 @@ void Activation::flashWrite()
     fs::path uploadDir(IMG_UPLOAD_DIR);
     fs::path toPath(PATH_INITRAMFS);
 
+    if ( fs::exists(uploadDir / versionId / FULL_IMAGE))
+    {
+        fs::copy_file(uploadDir / versionId / FULL_IMAGE, toPath / FULL_IMAGE,
+                            fs::copy_options::overwrite_existing);
+        return;
+    }
     for (auto& bmcImage : phosphor::software::image::bmcImages)
     {
         if ( fs::exists(uploadDir / versionId / bmcImage))
