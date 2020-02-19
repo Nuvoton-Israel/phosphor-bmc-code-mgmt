@@ -4,7 +4,8 @@ Wants=xyz.openbmc_project.Software.Version.service
 Before=xyz.openbmc_project.Software.Version.service
 Wants=obmc-mapper.target
 After=obmc-mapper.target
-After=mapper-wait@-xyz-openbmc_project-inventory.service
+After=obmc-read-eeprom@system-chassis-bmc.service
+After=obmc-read-eeprom@system-chassis-motherboard.service
 
 [Service]
 ExecStart=/usr/bin/phosphor-image-updater
