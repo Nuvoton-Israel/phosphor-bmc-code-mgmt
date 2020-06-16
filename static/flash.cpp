@@ -75,7 +75,7 @@ void HostActivation::flashWrite()
                     softwareServer::Activation::Activations::Failed);
                 return;
             }
-            fs::copy_file(uploadDir / versionId / bmcImage, "/tmp/bios-image",
+            fs::copy_file(uploadDir / versionId / bmcImage, "/tmp/image-bios",
                               fs::copy_options::overwrite_existing);
 
             auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
