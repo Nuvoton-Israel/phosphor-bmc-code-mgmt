@@ -6,8 +6,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <experimental/filesystem>
 #include <phosphor-logging/log.hpp>
+
+#include <filesystem>
 
 namespace phosphor
 {
@@ -17,7 +18,7 @@ namespace manager
 {
 
 using namespace phosphor::logging;
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 int Sync::processEntry(int mask, const fs::path& entryPath)
 {
@@ -26,7 +27,8 @@ int Sync::processEntry(int mask, const fs::path& entryPath)
 
     if (pid == 0)
     {
-        fs::path dst(ALT_RWFS / entryPath);
+        fs::path dst(ALT_RWFS);
+        dst /= entryPath.relative_path();
 
         // rsync needs an additional --delete argument to handle file deletions
         // so need to differentiate between the different file events.

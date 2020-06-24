@@ -3,12 +3,13 @@
 #include "image_manager.hpp"
 #include "watch.hpp"
 
-#include <cstdlib>
-#include <exception>
 #include <phosphor-logging/log.hpp>
 #include <sdbusplus/bus.hpp>
 
-int main(int argc, char* argv[])
+#include <cstdlib>
+#include <exception>
+
+int main()
 {
     using namespace phosphor::software::manager;
     auto bus = sdbusplus::bus::new_default();

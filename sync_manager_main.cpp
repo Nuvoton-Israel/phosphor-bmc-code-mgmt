@@ -5,12 +5,13 @@
 
 #include <systemd/sd-event.h>
 
-#include <exception>
 #include <phosphor-logging/log.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server/manager.hpp>
 
-int main(int argc, char* argv[])
+#include <exception>
+
+int main()
 {
     auto bus = sdbusplus::bus::new_default();
 

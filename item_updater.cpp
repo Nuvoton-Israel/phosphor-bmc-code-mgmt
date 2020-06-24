@@ -6,16 +6,18 @@
 #include "serialize.hpp"
 #include "version.hpp"
 
-#include <experimental/filesystem>
-#include <fstream>
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
 #include <phosphor-logging/log.hpp>
+#include <xyz/openbmc_project/Common/error.hpp>
+#include <xyz/openbmc_project/Software/Image/error.hpp>
+
+#include <filesystem>
+#include <fstream>
 #include <queue>
 #include <set>
 #include <string>
-#include <xyz/openbmc_project/Common/error.hpp>
-#include <xyz/openbmc_project/Software/Image/error.hpp>
+#include <thread>
 
 namespace phosphor
 {
@@ -31,7 +33,7 @@ namespace control = sdbusplus::xyz::openbmc_project::Control::server;
 using namespace phosphor::logging;
 using namespace sdbusplus::xyz::openbmc_project::Software::Image::Error;
 using namespace phosphor::software::image;
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 using NotAllowed = sdbusplus::xyz::openbmc_project::Common::Error::NotAllowed;
 using VersionPurpose = server::Version::VersionPurpose;
 
@@ -40,13 +42,11 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
 
     using SVersion = server::Version;
     using VersionClass = phosphor::software::manager::Version;
-    namespace mesg = sdbusplus::message;
-    namespace variant_ns = mesg::variant_ns;
 
-    mesg::object_path objPath;
+    sdbusplus::message::object_path objPath;
     auto purpose = VersionPurpose::Unknown;
     std::string version;
-    std::map<std::string, std::map<std::string, mesg::variant<std::string>>>
+    std::map<std::string, std::map<std::string, std::variant<std::string>>>
         interfaces;
     msg.read(objPath, interfaces);
     std::string path(std::move(objPath));
@@ -61,16 +61,17 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
                 if (property.first == "Purpose")
                 {
                     auto value = SVersion::convertVersionPurposeFromString(
-                        variant_ns::get<std::string>(property.second));
+                        std::get<std::string>(property.second));
                     if (value == VersionPurpose::BMC ||
-                        value == VersionPurpose::Host)
+                        value == VersionPurpose::Host ||
+                        value == VersionPurpose::System)
                     {
                         purpose = value;
                     }
                 }
                 else if (property.first == "Version")
                 {
-                    version = variant_ns::get<std::string>(property.second);
+                    version = std::get<std::string>(property.second);
                 }
             }
         }
@@ -80,7 +81,7 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
             {
                 if (property.first == "Path")
                 {
-                    filePath = variant_ns::get<std::string>(property.second);
+                    filePath = std::get<std::string>(property.second);
                 }
             }
         }
@@ -106,8 +107,12 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
     {
         // Determine the Activation state by processing the given image dir.
         auto activationState = server::Activation::Activations::Invalid;
-        ItemUpdater::ActivationStatus result =
-            ItemUpdater::validateSquashFSImage(filePath);
+        ItemUpdater::ActivationStatus result;
+        if (purpose == VersionPurpose::BMC || purpose == VersionPurpose::System)
+            result = ItemUpdater::validateSquashFSImage(filePath);
+        else
+            result = ItemUpdater::ActivationStatus::ready;
+
         AssociationList associations = {};
 
         if (result == ItemUpdater::ActivationStatus::ready)
@@ -255,7 +260,8 @@ void ItemUpdater::processBMCImage()
             // The versionId is extracted from the path
             // for example /media/ro-2a1022fe.
             auto id = iter.path().native().substr(BMC_RO_PREFIX_LEN);
-            auto osRelease = iter.path() / OS_RELEASE_FILE;
+            fs::path releaseFile(OS_RELEASE_FILE);
+            auto osRelease = iter.path() / releaseFile.relative_path();
             if (!fs::is_regular_file(osRelease))
             {
                 log<level::ERR>(
@@ -296,6 +302,10 @@ void ItemUpdater::processBMCImage()
                 // Create an active association since this image is active
                 createActiveAssociation(path);
             }
+
+            // All updateable firmware components must expose the updateable
+            // association.
+            createUpdateableAssociation(path);
 
             // Create Version instance for this version.
             auto versionPtr = std::make_unique<VersionClass>(
@@ -524,7 +534,12 @@ void ItemUpdater::freePriority(uint8_t value, const std::string& versionId)
 
 void ItemUpdater::reset()
 {
+    constexpr auto setFactoryResetWait = std::chrono::seconds(3);
     helper.factoryReset();
+
+    // Need to wait for env variables to complete, otherwise an immediate reboot
+    // will not factory reset.
+    std::this_thread::sleep_for(setFactoryResetWait);
 
     log<level::INFO>("BMC factory reset will take effect upon reboot.");
 }
@@ -661,6 +676,13 @@ void ItemUpdater::createFunctionalAssociation(const std::string& path)
 {
     assocs.emplace_back(std::make_tuple(FUNCTIONAL_FWD_ASSOCIATION,
                                         FUNCTIONAL_REV_ASSOCIATION, path));
+    associations(assocs);
+}
+
+void ItemUpdater::createUpdateableAssociation(const std::string& path)
+{
+    assocs.emplace_back(std::make_tuple(UPDATEABLE_FWD_ASSOCIATION,
+                                        UPDATEABLE_REV_ASSOCIATION, path));
     associations(assocs);
 }
 

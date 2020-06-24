@@ -4,8 +4,10 @@
 #include "xyz/openbmc_project/Object/Delete/server.hpp"
 #include "xyz/openbmc_project/Software/Version/server.hpp"
 
-#include <functional>
 #include <sdbusplus/bus.hpp>
+
+#include <functional>
+#include <string>
 
 namespace phosphor
 {
@@ -40,17 +42,10 @@ class Delete : public DeleteInherit
      *  @param[in] parent - Parent object.
      */
     Delete(sdbusplus::bus::bus& bus, const std::string& path, Version& parent) :
-        DeleteInherit(bus, path.c_str(), true), parent(parent), bus(bus),
-        path(path)
+        DeleteInherit(bus, path.c_str(), action::emit_interface_added),
+        parent(parent)
     {
-        std::vector<std::string> interfaces({interface});
-        bus.emit_interfaces_added(path.c_str(), interfaces);
-    }
-
-    ~Delete()
-    {
-        std::vector<std::string> interfaces({interface});
-        bus.emit_interfaces_removed(path.c_str(), interfaces);
+        // Empty
     }
 
     /** @brief delete the D-Bus object. */
@@ -59,11 +54,6 @@ class Delete : public DeleteInherit
   private:
     /** @brief Parent Object. */
     Version& parent;
-
-    // TODO Remove once openbmc/openbmc#1975 is resolved
-    static constexpr auto interface = "xyz.openbmc_project.Object.Delete";
-    sdbusplus::bus::bus& bus;
-    std::string path;
 };
 
 /** @class Version
@@ -87,10 +77,8 @@ class Version : public VersionInherit
             const std::string& versionString, VersionPurpose versionPurpose,
             const std::string& filePath, eraseFunc callback) :
         VersionInherit(bus, (objPath).c_str(), true),
-        versionStr(versionString)
+        eraseCallback(callback), versionStr(versionString)
     {
-        // Bind erase method
-        eraseCallback = callback;
         // Set properties.
         purpose(versionPurpose);
         version(versionString);

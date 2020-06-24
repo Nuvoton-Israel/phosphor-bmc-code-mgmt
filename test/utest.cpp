@@ -4,7 +4,7 @@
 #include <openssl/sha.h>
 #include <stdlib.h>
 
-#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -194,8 +194,6 @@ class SignatureTest : public testing::Test
         command("openssl rsa -in " + pkeyFile + " -outform PEM " +
                 "-pubout -out " + pubkeyFile);
 
-        std::string pubKeyConfFile =
-            signedConfOpenBMCPath.string() + "/" + "publickey";
         command("cp " + pubkeyFile + " " + signedConfOpenBMCPath.string());
         command(opensslCmd + pkeyFile + " -out " + kernelFile + ".sig " +
                 kernelFile);

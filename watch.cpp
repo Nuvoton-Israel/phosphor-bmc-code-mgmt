@@ -7,10 +7,11 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 
+#include <phosphor-logging/log.hpp>
+
 #include <cstddef>
 #include <cstring>
-#include <experimental/filesystem>
-#include <phosphor-logging/log.hpp>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 
@@ -23,7 +24,7 @@ namespace manager
 
 using namespace phosphor::logging;
 using namespace std::string_literals;
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 Watch::Watch(sd_event* loop, std::function<int(std::string&)> imageCallback) :
     imageCallback(imageCallback)
@@ -74,7 +75,7 @@ Watch::~Watch()
     }
 }
 
-int Watch::callback(sd_event_source* s, int fd, uint32_t revents,
+int Watch::callback(sd_event_source* /* s */, int fd, uint32_t revents,
                     void* userdata)
 {
     if (!(revents & EPOLLIN))

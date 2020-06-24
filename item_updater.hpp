@@ -6,11 +6,14 @@
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/Software/Version/server.hpp"
 #include "xyz/openbmc_project/Software/HostVer/server.hpp"
+//#include <xyz/openbmc_project/Software/Image/server.hpp>
 
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/FactoryReset/server.hpp>
 #include <xyz/openbmc_project/Control/FieldMode/server.hpp>
+
+#include <string>
 
 namespace phosphor
 {
@@ -174,6 +177,13 @@ class ItemUpdater : public ItemUpdaterInherit
      * @param[in] version  - the version of BIOS
      */
     void updateHostVer(std::string version) override;
+
+    /** @brief Creates a updateable association to the
+     *  "running" BMC software image
+     *
+     * @param[in]  path - The path to create the association.
+     */
+    void createUpdateableAssociation(const std::string& path);
 
     /** @brief Persistent map of Version D-Bus objects and their
      * version id */

@@ -7,8 +7,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <experimental/filesystem>
+#include <filesystem>
 #include <set>
+#include <string>
 
 namespace phosphor
 {
@@ -17,7 +18,7 @@ namespace software
 namespace image
 {
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 using Key_t = std::string;
 using Hash_t = std::string;
 using PublicKeyPath = fs::path;
@@ -48,8 +49,7 @@ struct CustomFd
      *  @param[in] fd - File descriptor
      */
     CustomFd(int fd) : fd(fd)
-    {
-    }
+    {}
 
     ~CustomFd()
     {
@@ -95,8 +95,7 @@ struct CustomMap
      *  @param[in]  length - length of the map
      */
     CustomMap(void* addr, size_t length) : addr(addr), length(length)
-    {
-    }
+    {}
 
     ~CustomMap()
     {
