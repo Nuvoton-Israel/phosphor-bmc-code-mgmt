@@ -540,7 +540,7 @@ void ItemUpdater::freePriority(uint8_t value, const std::string& versionId)
 
 void ItemUpdater::reset()
 {
-    constexpr auto setFactoryResetWait = std::chrono::seconds(3);
+    constexpr auto setFactoryResetWait = std::chrono::seconds(10);
     helper.factoryReset();
 
     // Need to wait for env variables to complete, otherwise an immediate reboot
