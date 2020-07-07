@@ -377,6 +377,11 @@ class HostActivation : public Activation
         log<level::DEBUG>("HostActivation::constructor");
         biosFlashed = false;
     }
+
+    ~HostActivation()
+    {
+        log<level::DEBUG>("HostActivation::destructor");
+    }
     // NOTE: below override functions already declare as virtual function,
     //       in base class, so we don't need change more things.
 
