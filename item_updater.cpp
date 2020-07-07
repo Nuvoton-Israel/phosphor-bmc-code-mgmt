@@ -16,6 +16,7 @@
 #include <fstream>
 #include <queue>
 #include <set>
+#include <list>
 #include <string>
 #include <thread>
 
@@ -185,6 +186,7 @@ void ItemUpdater::processHostImage()
 void ItemUpdater::createHostVersion(const std::string& version)
 {
     using VersionClass = phosphor::software::manager::Version;
+    log<level::INFO>(("created host version: " + version).c_str());
 
     auto activationState = server::Activation::Activations::Active;
     auto purpose = server::Version::VersionPurpose::Host;
@@ -825,63 +827,78 @@ void ItemUpdater::updateHostVer(std::string version)
         return;
     }
     log<level::INFO>(("Try to update host version: " + version).c_str());
-    auto _found = false;
-    std::string _orig_id;
+    auto _verId = VersionClass::getId(version);
+    std::list<std::string> nonActiveHostVids = {};
+    std::string activeHostVid;
     // we must find from activations, only activation contains versionId data
     for (const auto& iter : activations)
     {
         auto _activation = iter.second->activation();
-        if (_activation == server::Activation::Activations::Active)
+        auto _version = versions.find(iter.second->versionId);
+        // cannot find mapping version
+        if (_version == versions.end())
         {
-            auto _version = versions.find(iter.second->versionId);
-            // cannot find mapping version
-            if (_version == versions.end())
+            log<level::ERR>("Cannot find mapping version data",
+                entry("VERSIONID=%s", iter.second->versionId.c_str()));
+            continue;
+        }
+        // we only take care host version
+        if (_version->second->purpose() == VersionPurpose::Host)
+        {
+            // collect host versions in active and non-active
+            if (_activation == server::Activation::Activations::Active)
             {
-                log<level::ERR>("Cannot find mapping version data",
-                    entry("VERSIONID=%s", iter.second->versionId.c_str()));
-                continue;
+                // there must only one host is active
+                activeHostVid = iter.second->versionId;
             }
-            if (_version->second->purpose() == VersionPurpose::Host)
+            else
             {
-                _found = true;
-                // handle update version
-                // now exist an object purpose==host, activation==active
-                // check current version is match version id or not
-                // this case should only exist at update BIOS from host
-                auto _verId = VersionClass::getId(version);
-                if (_verId != iter.second->versionId)
-                {
-                    // delete old version, then create new one
-                    _orig_id = iter.second->versionId;
-                    _found = false;
-                    log<level::WARNING>("Error: Host version is not matched "
-                        "currently running version id.",
-                        entry("VERSIONID=%s", _orig_id.c_str()));
-                    // also clear associations if need clear activations object
-                    removeAssociations(iter.second->path);
-                }
-                else
-                {
-                    log<level::INFO>(("Already get version: " + version).c_str());
-                }
-
-                break;
+                nonActiveHostVids.emplace_back(iter.second->versionId);
             }
         }
     }
-    // handle delete version
-    if(!_orig_id.empty())
-    {
-        this->activations.erase(_orig_id);
-        this->versions.erase(_orig_id);
-    }
 
-    // handle create version
-    if (!_found)
+    char msgBuff[128];
+    snprintf(msgBuff, sizeof(msgBuff),
+        "Active host: %s, non-active host length: %d\n",
+        activeHostVid.empty()?"":activeHostVid.c_str(),
+        nonActiveHostVids.size());
+    log<level::DEBUG>(msgBuff);
+    // there already exist active host
+    if (!activeHostVid.empty())
     {
-        // create host version
-        createHostVersion(version);
-        log<level::INFO >(("created host version" + version).c_str());
+        // remove old acitve version and create new one
+        if (_verId != activeHostVid)
+        {
+            this->activations.erase(activeHostVid);
+            this->versions.erase(activeHostVid);
+            createHostVersion(version);
+        }
+        // same version id just ignore
+    }
+    else
+    {
+        // handle first time get host version
+        if (nonActiveHostVids.size() == 0)
+        {
+            createHostVersion(version);
+        }
+        else
+        {
+            // here is error handling
+            log<level::ERR>("there must exist one active host!!");
+            auto host_it = std::find(
+                nonActiveHostVids.begin(),nonActiveHostVids.end(), _verId);
+            if (host_it == nonActiveHostVids.end())
+            {
+                // still try to create host version if version is different
+                createHostVersion(version);
+            }
+            else
+            {
+                log<level::INFO >("ignore to craete same version in error activate");
+            }
+        }
     }
 }
 
