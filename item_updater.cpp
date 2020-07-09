@@ -109,10 +109,14 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
         // Determine the Activation state by processing the given image dir.
         auto activationState = server::Activation::Activations::Invalid;
         ItemUpdater::ActivationStatus result;
+#if 1 // Nuvoton BIOS image should be valid
+        result = ItemUpdater::validateSquashFSImage(filePath);
+#else // Facebook host update
         if (purpose == VersionPurpose::BMC || purpose == VersionPurpose::System)
             result = ItemUpdater::validateSquashFSImage(filePath);
         else
             result = ItemUpdater::ActivationStatus::ready;
+#endif
 
         AssociationList associations = {};
 
