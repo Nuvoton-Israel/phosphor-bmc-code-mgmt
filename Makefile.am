@@ -9,6 +9,7 @@ noinst_HEADERS = \
 	image_manager.hpp \
 	item_updater.hpp \
 	activation.hpp \
+	activation_mcu.hpp \
 	flash.hpp \
 	item_updater_helper.hpp \
 	utils.hpp
@@ -45,6 +46,7 @@ phosphor_download_manager_SOURCES = \
 
 phosphor_image_updater_SOURCES = \
 	activation.cpp \
+	activation_mcu.cpp \
 	version.cpp \
 	serialize.cpp \
 	item_updater.cpp \

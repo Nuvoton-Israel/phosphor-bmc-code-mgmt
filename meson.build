@@ -99,6 +99,7 @@ subdir('xyz/openbmc_project/Software/HostVer')
 
 image_updater_sources = files(
     'activation.cpp',
+    'activation_mcu.cpp',
     'item_updater.cpp',
     'item_updater_main.cpp',
     'serialize.cpp',

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "activation.hpp"
+#include "activation_mcu.hpp"
+
 #include "item_updater_helper.hpp"
 #include "version.hpp"
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
