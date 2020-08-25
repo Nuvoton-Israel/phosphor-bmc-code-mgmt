@@ -65,7 +65,8 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
                         std::get<std::string>(property.second));
                     if (value == VersionPurpose::BMC ||
                         value == VersionPurpose::Host ||
-                        value == VersionPurpose::System)
+                        value == VersionPurpose::System ||
+                        value == VersionPurpose::MCU)
                     {
                         purpose = value;
                     }
@@ -123,25 +124,33 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
         if (result == ItemUpdater::ActivationStatus::ready)
         {
             activationState = server::Activation::Activations::Ready;
-            // Create an association to the BMC inventory item
-            std::string _inventoryPath;
-            if (purpose == VersionPurpose::Host)
+            if (purpose != VersionPurpose::MCU)
             {
-                _inventoryPath = hostInventoryPath;
+                // Create an association to the BMC inventory item
+                std::string _inventoryPath;
+                if (purpose == VersionPurpose::Host)
+                {
+                    _inventoryPath = hostInventoryPath;
+                }
+                else
+                {
+                    _inventoryPath = bmcInventoryPath;
+                }
+                associations.emplace_back(
+                    std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
+                                    ACTIVATION_REV_ASSOCIATION, _inventoryPath));
             }
-            else
-            {
-                _inventoryPath = bmcInventoryPath;
-            }
-            associations.emplace_back(
-                std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
-                                ACTIVATION_REV_ASSOCIATION, _inventoryPath));
         }
 
         std::unique_ptr<Activation> activationPtr;
         if (purpose == VersionPurpose::Host)
         {
             activationPtr = std::make_unique<HostActivation>(bus, path,
+                        *this, versionId, activationState, associations);
+        }
+        else if (purpose == VersionPurpose::MCU)
+        {
+            activationPtr = std::make_unique<McuActivation>(bus, path,
                         *this, versionId, activationState, associations);
         }
         else

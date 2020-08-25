@@ -14,6 +14,7 @@ namespace image
 const std::vector<std::string> bmcImages = {"image-kernel", "image-rofs",
                                             "image-rwfs", "image-u-boot",
                                             "image-bmc", "image-bios",
+                                            "image-mcu",
                                             };
 
 } // namespace image
