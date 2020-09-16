@@ -179,6 +179,8 @@ bool Version::isFunctional()
         return true;
     else if(versionStr == getBMCVersion(BIOS_FW_FILE))
         return true;
+    else if(versionStr == getBMCVersion(MCU_FW_FILE))
+        return true;
     else
         return false;
 }

@@ -124,22 +124,23 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
         if (result == ItemUpdater::ActivationStatus::ready)
         {
             activationState = server::Activation::Activations::Ready;
-            if (purpose != VersionPurpose::MCU)
+            // Create an association to the BMC inventory item
+            std::string _inventoryPath;
+            if (purpose == VersionPurpose::Host)
             {
-                // Create an association to the BMC inventory item
-                std::string _inventoryPath;
-                if (purpose == VersionPurpose::Host)
-                {
-                    _inventoryPath = hostInventoryPath;
-                }
-                else
-                {
-                    _inventoryPath = bmcInventoryPath;
-                }
-                associations.emplace_back(
-                    std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
-                                    ACTIVATION_REV_ASSOCIATION, _inventoryPath));
+                _inventoryPath = hostInventoryPath;
             }
+            else if (purpose == VersionPurpose::MCU)
+            {
+                _inventoryPath = mcuInventoryPath;
+            }
+            else
+            {
+                _inventoryPath = bmcInventoryPath;
+            }
+            associations.emplace_back(
+                std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
+                                ACTIVATION_REV_ASSOCIATION, _inventoryPath));
         }
 
         std::unique_ptr<Activation> activationPtr;
@@ -227,6 +228,73 @@ void ItemUpdater::createHostVersion(const std::string& version)
     // Create Activation instance for this version.
     activations.insert(std::make_pair(
         id, std::make_unique<HostActivation>(bus, path, *this, id,
+                                    activationState, associations)));
+
+    uint8_t priority = std::numeric_limits<uint8_t>::max();
+    if (!restorePriority(id, priority))
+        priority = 0;
+
+    activations.find(id)->second->redundancyPriority =
+        std::make_unique<RedundancyPriority>(
+            bus, path, *(activations.find(id)->second), priority, false);
+
+    return;
+}
+
+void ItemUpdater::processMcuImage()
+{
+    auto mcuRelease = fs::path(MCU_FW_FILE);
+
+    if (!fs::is_regular_file(mcuRelease))
+    {
+        log<level::INFO>("Failed to read mcuRelease",
+                        entry("FILENAME=%s", mcuRelease.string().c_str()));
+        return;
+    }
+
+    // Read mcu-release from /usr/share/phosphor-bmc-code-mgmt to get the initial MCU version
+    auto initialVersion = VersionClass::getBMCVersion(mcuRelease);
+    if (initialVersion != INVALID_VERSION)
+    {
+        createMcuVersion(initialVersion);
+    }
+    else
+    {
+        log<level::INFO>("Invalid version, skip create mcu version!");
+    }
+}
+
+void ItemUpdater::createMcuVersion(const std::string& version)
+{
+    using VersionClass = phosphor::software::manager::Version;
+    log<level::INFO>(("created mcu version: " + version).c_str());
+
+    auto activationState = server::Activation::Activations::Active;
+    auto purpose = server::Version::VersionPurpose::MCU;
+    auto id = VersionClass::getId(version);
+    auto path = fs::path(SOFTWARE_OBJPATH) / id;
+    createFunctionalAssociation(path);
+
+    AssociationList associations = {};
+
+    // Create an association to the system inventory item
+    associations.emplace_back(std::make_tuple(ACTIVATION_FWD_ASSOCIATION,
+                                              ACTIVATION_REV_ASSOCIATION,
+                                              mcuInventoryPath));
+
+    // Create an active association since this image is active
+    createActiveAssociation(path);
+
+    // Create Version instance for this version.
+    auto versionPtr = std::make_unique<VersionClass>(
+        bus, path, version, purpose, "",
+        std::bind(&ItemUpdater::erase, this, std::placeholders::_1));
+
+    versions.insert(std::make_pair(id, std::move(versionPtr)));
+
+    // Create Activation instance for this version.
+    activations.insert(std::make_pair(
+        id, std::make_unique<McuActivation>(bus, path, *this, id,
                                     activationState, associations)));
 
     uint8_t priority = std::numeric_limits<uint8_t>::max();
@@ -646,7 +714,6 @@ void ItemUpdater::setHostInventoryPath()
     return;
 }
 
-
 void ItemUpdater::setBMCInventoryPath()
 {
     auto depth = 0;
@@ -674,6 +741,39 @@ void ItemUpdater::setBMCInventoryPath()
     catch (const sdbusplus::exception::SdBusError& e)
     {
         log<level::ERR>("Error in mapper GetSubTreePath");
+        return;
+    }
+
+    return;
+}
+
+void ItemUpdater::setMcuInventoryPath()
+{
+    auto depth = 0;
+    auto mapperCall = bus.new_method_call(MAPPER_BUSNAME, MAPPER_PATH,
+                                          MAPPER_INTERFACE, "GetSubTreePaths");
+
+    mapperCall.append(INVENTORY_PATH);
+    mapperCall.append(depth);
+    std::vector<std::string> filter = {"xyz.openbmc_project.Inventory.Item.Mcu"};
+    mapperCall.append(filter);
+
+    try
+    {
+        auto response = bus.call(mapperCall);
+
+        using ObjectPaths = std::vector<std::string>;
+        ObjectPaths result;
+        response.read(result);
+
+        if (!result.empty())
+        {
+            mcuInventoryPath = result.front();
+        }
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::INFO>("Error in mapper Mcu GetSubTreePath");
         return;
     }
 
