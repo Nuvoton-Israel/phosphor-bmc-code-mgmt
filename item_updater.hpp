@@ -72,6 +72,8 @@ class ItemUpdater : public ItemUpdaterInherit
         processBMCImage();
         setHostInventoryPath();
         processHostImage();
+        setMcuInventoryPath();
+        processMcuImage();
         restoreFieldModeStatus();
         emit_object_added();
     };
@@ -104,6 +106,11 @@ class ItemUpdater : public ItemUpdaterInherit
      * @brief Create and populate the active BIOS Version.
      */
     void processHostImage();
+
+    /**
+     * @brief Create and populate the active MCU Version.
+     */
+    void processMcuImage();
 
     /**
      * @brief Erase specified entry D-Bus object
@@ -232,11 +239,18 @@ class ItemUpdater : public ItemUpdaterInherit
      *  /xyz/openbmc_project/inventory/system/chassis/. */
     void setHostInventoryPath();
 
+    /** @brief Sets the Mcu inventory item path under
+     *  /xyz/openbmc_project/inventory/system/chassis/. */
+    void setMcuInventoryPath();
+
     /** @brief The path to the BMC inventory item. */
     std::string bmcInventoryPath;
 
     /** @brief The path to the System inventory item. */
     std::string hostInventoryPath;
+
+    /** @brief The path to the MCU inventory item. */
+    std::string mcuInventoryPath;
 
     /** @brief Restores field mode status on reboot. */
     void restoreFieldModeStatus();
@@ -275,6 +289,13 @@ class ItemUpdater : public ItemUpdaterInherit
      * @param[in]  value  - The real BIOS version from IPMI daemon.
      */
     void createHostVersion(const std::string& version);
+
+    /** @brief Update or create new MCU version and activation D-Bus
+     * object from input version.
+     *
+     * @param[in]  value  - The real MCU version from I2C command.
+     */
+    void createMcuVersion(const std::string& version);
 };
 
 } // namespace updater

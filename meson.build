@@ -47,6 +47,7 @@ conf.set_quoted('OS_RELEASE_FILE', '/etc/os-release')
 conf.set_quoted('PERSIST_DIR', '/var/lib/phosphor-bmc-code-mgmt/')
 
 conf.set_quoted('BIOS_FW_FILE', '/usr/share/phosphor-bmc-code-mgmt/bios-release')
+conf.set_quoted('MCU_FW_FILE', '/usr/share/phosphor-bmc-code-mgmt/mcu-release')
 
 # Supported BMC layout types
 conf.set('STATIC_LAYOUT', get_option('bmc-layout').contains('static'))
@@ -182,6 +183,10 @@ install_data('software.conf',
 )
 
 install_data('bios-release',
+    install_dir: '/usr/share/phosphor-bmc-code-mgmt/'
+)
+
+install_data('mcu-release',
     install_dir: '/usr/share/phosphor-bmc-code-mgmt/'
 )
 
