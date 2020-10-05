@@ -223,7 +223,9 @@ void Manager::erase(std::string entryId)
         return;
     }
 
-    if (it->second->isFunctional())
+    auto purpose = it->second->purpose();
+
+    if (it->second->isFunctional() && (purpose != Version::VersionPurpose::MCU))
     {
         log<level::ERR>(("Error: Version " + entryId +
                          " is currently running on the BMC."
