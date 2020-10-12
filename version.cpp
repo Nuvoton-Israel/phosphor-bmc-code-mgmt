@@ -132,7 +132,7 @@ std::string Version::getBMCVersion(const std::string& releaseFilePath)
     std::string versionKey = "VERSION_ID=";
     std::string versionValue{};
     std::string version{};
-    std::ifstream efile;
+    std::fstream efile;
     std::string line;
     efile.open(releaseFilePath);
 
