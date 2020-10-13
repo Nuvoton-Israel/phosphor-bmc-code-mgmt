@@ -187,6 +187,7 @@ install_data('bios-release',
 )
 
 install_data('mcu-release',
+    install_mode: 'rwxrwxrwx',
     install_dir: '/usr/share/phosphor-bmc-code-mgmt/'
 )
 
