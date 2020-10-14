@@ -186,11 +186,6 @@ install_data('bios-release',
     install_dir: '/usr/share/phosphor-bmc-code-mgmt/'
 )
 
-install_data('mcu-release',
-    install_mode: 'rwxrwxrwx',
-    install_dir: '/usr/share/phosphor-bmc-code-mgmt/'
-)
-
 foreach u : unit_files
     configure_file(
         copy: true,
