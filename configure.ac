@@ -117,8 +117,6 @@ AC_DEFINE(SYSTEMD_INTERFACE, "org.freedesktop.systemd1.Manager",
     [The systemd interface])
 AC_DEFINE(BIOS_FW_FILE, "/usr/share/phosphor-bmc-code-mgmt/bios-release",
     [The name of the BIOS table of contents file])
-AC_DEFINE(MCU_FW_FILE, "/usr/share/phosphor-bmc-code-mgmt/mcu-release",
-    [The name of the MCU table of contents file])
 
 AC_ARG_VAR(MEDIA_DIR, [The base dir where all RO partitions are mounted])
 AS_IF([test "x$MEDIA_DIR" == "x"], [MEDIA_DIR="/media"])
