@@ -111,7 +111,12 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
         auto activationState = server::Activation::Activations::Invalid;
         ItemUpdater::ActivationStatus result;
 #if 1 // Nuvoton BIOS image should be valid
-        result = ItemUpdater::validateSquashFSImage(filePath);
+        if (purpose == VersionPurpose::BMC || purpose == VersionPurpose::System)
+            result = ItemUpdater::validateSquashFSImage(filePath);
+        else if (purpose == VersionPurpose::Host)
+            result = ItemUpdater::validateBIOSImage(filePath);
+        else
+            result = ItemUpdater::validateMCUImage(filePath);
 #else // Facebook host update
         if (purpose == VersionPurpose::BMC || purpose == VersionPurpose::System)
             result = ItemUpdater::validateSquashFSImage(filePath);
@@ -564,12 +569,50 @@ void ItemUpdater::deleteAll()
 }
 
 ItemUpdater::ActivationStatus
+    ItemUpdater::validateBIOSImage(const std::string& filePath)
+{
+    bool valid = true;
+
+
+    imageUpdateList.clear();
+    imageUpdateList.push_back(biosFullImages);
+    valid = checkImage(filePath, imageUpdateList);
+    if (!valid)
+    {
+        log<level::ERR>("Failed to find the needed BIOS images.");
+        return ItemUpdater::ActivationStatus::invalid;
+    }
+
+
+    return ItemUpdater::ActivationStatus::ready;
+}
+
+ItemUpdater::ActivationStatus
+    ItemUpdater::validateMCUImage(const std::string& filePath)
+{
+    bool valid = true;
+
+    imageUpdateList.clear();
+    imageUpdateList.push_back(mcuFullImages);
+    valid = checkImage(filePath, imageUpdateList);
+    if (!valid)
+    {
+        log<level::ERR>("Failed to find the needed MCU images.");
+        return ItemUpdater::ActivationStatus::invalid;
+    }
+
+
+    return ItemUpdater::ActivationStatus::ready;
+}
+
+ItemUpdater::ActivationStatus
     ItemUpdater::validateSquashFSImage(const std::string& filePath)
 {
     bool valid = true;
 
     // Record the images which are being updated
     // First check for the fullimage, then check for images with partitions
+    imageUpdateList.clear();
     imageUpdateList.push_back(bmcFullImages);
     valid = checkImage(filePath, imageUpdateList);
     if (!valid)

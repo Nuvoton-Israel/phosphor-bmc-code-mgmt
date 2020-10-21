@@ -222,6 +222,30 @@ class ItemUpdater : public ItemUpdaterInherit
      */
     ActivationStatus validateSquashFSImage(const std::string& filePath);
 
+    /**
+     * @brief Validates the presence of BIOS image in the image dir.
+     *
+     * @param[in]  filePath  - The path to the image dir.
+     * @param[out] result    - ActivationStatus Enum.
+     *                         ready if validation was successful.
+     *                         invalid if validation fail.
+     *                         active if image is the current version.
+     *
+     */
+    ActivationStatus validateBIOSImage(const std::string& filePath);
+
+    /**
+     * @brief Validates the presence of MCU image in the image dir.
+     *
+     * @param[in]  filePath  - The path to the image dir.
+     * @param[out] result    - ActivationStatus Enum.
+     *                         ready if validation was successful.
+     *                         invalid if validation fail.
+     *                         active if image is the current version.
+     *
+     */
+    ActivationStatus validateMCUImage(const std::string& filePath);
+
     /** @brief BMC factory reset - marks the read-write partition for
      * recreation upon reboot. */
     void reset() override;
