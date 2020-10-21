@@ -2,12 +2,14 @@
 
 #include "images.hpp"
 #include "item_updater.hpp"
+#include "msl_verify.hpp"
 #include "serialize.hpp"
 
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
 #include <sdbusplus/exception.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
+#include <xyz/openbmc_project/Software/Version/error.hpp>
 
 #ifdef WANT_SIGNATURE_VERIFY
 #include "image_verify.hpp"
@@ -77,7 +79,6 @@ void Activation::unsubscribeFromSystemdSignals()
 
 auto Activation::activation(Activations value) -> Activations
 {
-
     if ((value != softwareServer::Activation::Activations::Active) &&
         (value != softwareServer::Activation::Activations::Activating))
     {
@@ -109,6 +110,24 @@ auto Activation::activation(Activations value) -> Activations
             return softwareServer::Activation::activation(value);
         }
 #endif
+
+        auto versionStr = parent.versions.find(versionId)->second->version();
+
+        if (!minimum_ship_level::verify(versionStr))
+        {
+            using namespace phosphor::logging;
+            using IncompatibleErr = sdbusplus::xyz::openbmc_project::Software::
+                Version::Error::Incompatible;
+            using Incompatible =
+                xyz::openbmc_project::Software::Version::Incompatible;
+
+            report<IncompatibleErr>(
+                prev_entry<Incompatible::MIN_VERSION>(),
+                prev_entry<Incompatible::ACTUAL_VERSION>(),
+                prev_entry<Incompatible::VERSION_PURPOSE>());
+            return softwareServer::Activation::activation(
+                softwareServer::Activation::Activations::Failed);
+        }
 
 #ifdef WANT_SIGNATURE_VERIFY
         fs::path uploadDir(IMG_UPLOAD_DIR);
@@ -145,11 +164,11 @@ auto Activation::activation(Activations value) -> Activations
 
         flashWrite();
 
-#ifdef UBIFS_LAYOUT
+#if defined UBIFS_LAYOUT || defined MMC_LAYOUT
 
         return softwareServer::Activation::activation(value);
 
-#else // !UBIFS_LAYOUT
+#else // STATIC_LAYOUT
 
         onFlashWriteSuccess();
         return softwareServer::Activation::activation(

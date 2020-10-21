@@ -6,6 +6,7 @@
 #include "activation_mcu.hpp"
 
 #include "images.hpp"
+#include "item_updater.hpp"
 
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
@@ -33,6 +34,7 @@ auto constexpr FULL_IMAGE = "image-bmc";
 auto constexpr BIOS_IMAGE = "image-bios";
 auto constexpr MCU_IMAGE  = "image-mcu";
 namespace fs = std::filesystem;
+using namespace phosphor::software::image;
 
 void Activation::flashWrite()
 {
@@ -42,13 +44,7 @@ void Activation::flashWrite()
     fs::path uploadDir(IMG_UPLOAD_DIR);
     fs::path toPath(PATH_INITRAMFS);
 
-    if ( fs::exists(uploadDir / versionId / FULL_IMAGE))
-    {
-        fs::copy_file(uploadDir / versionId / FULL_IMAGE, toPath / FULL_IMAGE,
-                            fs::copy_options::overwrite_existing);
-        return;
-    }
-    for (auto& bmcImage : phosphor::software::image::bmcImages)
+    for (const auto& bmcImage : parent.imageUpdateList)
     {
         if ( fs::exists(uploadDir / versionId / bmcImage))
         {

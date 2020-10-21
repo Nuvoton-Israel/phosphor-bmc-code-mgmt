@@ -13,9 +13,14 @@ namespace image
 // BMC flash image file name list.
 const std::vector<std::string> bmcImages = {"image-kernel", "image-rofs",
                                             "image-rwfs", "image-u-boot",
-                                            "image-bmc", "image-bios",
-                                            "image-mcu",
+                                            "image-bios", "image-mcu"
                                             };
+
+// BMC flash image file name list for full flash image (image-bmc)
+const std::string bmcFullImages = {"image-bmc"};
+
+std::vector<std::string> getOptionalImages();
+
 
 } // namespace image
 } // namespace software

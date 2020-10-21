@@ -1,5 +1,5 @@
 # Supported BMC layout types. Reference:
-# https://github.com/openbmc/docs/blob/master/code-update/flash-layout.md#supported-filesystem-choices
+# https://github.com/openbmc/docs/blob/master/architecture/code-update/flash-layout.md#supported-filesystem-choices
 # - static: NOR flash configured with fixed-sized MTD partitions.
 # - ubi: NOR flash device configured with UBI volumes.
 # - mmc: eMMC flash device configured with ext4 filesystems.
@@ -54,6 +54,13 @@ option(
 )
 
 option(
+    'optional-images', type: 'array',
+    choices: ['image-hostfw'],
+    value: [],
+    description: 'A list of additional image files in the BMC tarball.',
+)
+
+option(
     'publickey-file-name', type: 'string',
     value: 'publickey',
     description: 'The name of the public key file.',
@@ -81,4 +88,16 @@ option(
     'sync-list-file-name', type: 'string',
     value: 'synclist',
     description: 'The name of the sync list file.',
+)
+
+option(
+    'bmc-msl', type: 'string',
+    value: '',
+    description: 'The BMC minimum ship level.',
+)
+
+option(
+    'regex-bmc-msl', type: 'string',
+    value: '',
+    description: 'The Regular expression to parse the MSL.',
 )

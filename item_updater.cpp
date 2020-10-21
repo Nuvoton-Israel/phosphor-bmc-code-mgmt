@@ -340,9 +340,7 @@ void ItemUpdater::processBMCImage()
         if (0 ==
             iter.path().native().compare(0, BMC_RO_PREFIX_LEN, BMC_ROFS_PREFIX))
         {
-            // The versionId is extracted from the path
-            // for example /media/ro-2a1022fe.
-            auto id = iter.path().native().substr(BMC_RO_PREFIX_LEN);
+            // Get the version to calculate the id
             fs::path releaseFile(OS_RELEASE_FILE);
             auto osRelease = iter.path() / releaseFile.relative_path();
             if (!fs::is_regular_file(osRelease))
@@ -350,7 +348,15 @@ void ItemUpdater::processBMCImage()
                 log<level::ERR>(
                     "Failed to read osRelease",
                     entry("FILENAME=%s", osRelease.string().c_str()));
+
+                // Try to get the version id from the mount directory name and
+                // call to delete it as this version may be corrupted. Dynamic
+                // volumes created by the UBI layout for example have the id in
+                // the mount directory name. The worst that can happen is that
+                // erase() is called with an non-existent id and returns.
+                auto id = iter.path().native().substr(BMC_RO_PREFIX_LEN);
                 ItemUpdater::erase(id);
+
                 continue;
             }
             auto version = VersionClass::getBMCVersion(osRelease);
@@ -359,7 +365,23 @@ void ItemUpdater::processBMCImage()
                 log<level::ERR>(
                     "Failed to read version from osRelease",
                     entry("FILENAME=%s", osRelease.string().c_str()));
-                activationState = server::Activation::Activations::Invalid;
+
+                // Try to delete the version, same as above if the
+                // OS_RELEASE_FILE does not exist.
+                auto id = iter.path().native().substr(BMC_RO_PREFIX_LEN);
+                ItemUpdater::erase(id);
+
+                continue;
+            }
+
+            auto id = VersionClass::getId(version);
+
+            // Check if the id has already been added. This can happen if the
+            // BMC partitions / devices were manually flashed with the same
+            // image.
+            if (versions.find(id) != versions.end())
+            {
+                continue;
             }
 
             auto purpose = server::Version::VersionPurpose::BMC;
@@ -433,8 +455,9 @@ void ItemUpdater::processBMCImage()
         }
     }
 
-    // If there is no ubi volume for bmc version then read the /etc/os-release
-    // and create rofs-<versionId> under /media
+    // If there are no bmc versions mounted under MEDIA_DIR, then read the
+    // /etc/os-release and create rofs-<versionId> under MEDIA_DIR, then call
+    // again processBMCImage() to create the D-Bus interface for it.
     if (activations.size() < 2)
     {
         auto version = VersionClass::getBMCVersion(OS_RELEASE_FILE);
@@ -473,7 +496,30 @@ void ItemUpdater::erase(std::string entryId)
                             entry("VERSIONID=%s", entryId.c_str()));
             return;
         }
+    }
 
+    // First call resetUbootEnvVars() so that the BMC points to a valid image to
+    // boot from. If resetUbootEnvVars() is called after the image is actually
+    // deleted from the BMC flash, there'd be a time window where the BMC would
+    // be pointing to a non-existent image to boot from.
+    // Need to remove the entries from the activations map before that call so
+    // that resetUbootEnvVars() doesn't use the version to be deleted.
+    auto iteratorActivations = activations.find(entryId);
+    if (iteratorActivations == activations.end())
+    {
+        log<level::ERR>("Error: Failed to find version in item updater "
+                        "activations map. Unable to remove.",
+                        entry("VERSIONID=%s", entryId.c_str()));
+    }
+    else
+    {
+        removeAssociations(iteratorActivations->second->path);
+        this->activations.erase(entryId);
+    }
+    ItemUpdater::resetUbootEnvVars();
+
+    if (it != versions.end())
+    {
         // Delete ReadOnly partitions if it's not active
         removeReadOnlyPartition(entryId);
         removePersistDataDirectory(entryId);
@@ -494,20 +540,6 @@ void ItemUpdater::erase(std::string entryId)
 
     helper.clearEntry(entryId);
 
-    // Removing entry in activations map
-    auto ita = activations.find(entryId);
-    if (ita == activations.end())
-    {
-        log<level::ERR>("Error: Failed to find version in item updater "
-                        "activations map. Unable to remove.",
-                        entry("VERSIONID=%s", entryId.c_str()));
-    }
-    else
-    {
-        removeAssociations(ita->second->path);
-        this->activations.erase(entryId);
-    }
-    ItemUpdater::resetUbootEnvVars();
     return;
 }
 
@@ -534,22 +566,22 @@ void ItemUpdater::deleteAll()
 ItemUpdater::ActivationStatus
     ItemUpdater::validateSquashFSImage(const std::string& filePath)
 {
-    bool invalid = true;
+    bool valid = true;
 
-    for (auto& bmcImage : bmcImages)
+    // Record the images which are being updated
+    // First check for the fullimage, then check for images with partitions
+    imageUpdateList.push_back(bmcFullImages);
+    valid = checkImage(filePath, imageUpdateList);
+    if (!valid)
     {
-        fs::path file(filePath);
-        file /= bmcImage;
-        std::ifstream efile(file.c_str());
-        if (efile.good())
+        imageUpdateList.clear();
+        imageUpdateList.assign(bmcImages.begin(), bmcImages.end());
+        valid = checkImage(filePath, imageUpdateList);
+        if (!valid)
         {
-            invalid = false;
+            log<level::ERR>("Failed to find the needed BMC images.");
+            return ItemUpdater::ActivationStatus::invalid;
         }
-    }
-
-    if (invalid)
-    {
-        return ItemUpdater::ActivationStatus::invalid;
     }
 
     return ItemUpdater::ActivationStatus::ready;
@@ -1013,6 +1045,26 @@ void ItemUpdater::updateHostVer(std::string version)
             }
         }
     }
+}
+
+bool ItemUpdater::checkImage(const std::string& filePath,
+                             const std::vector<std::string>& imageList)
+{
+    bool valid = true;
+
+    for (auto& bmcImage : imageList)
+    {
+        fs::path file(filePath);
+        file /= bmcImage;
+        std::ifstream efile(file.c_str());
+        if (efile.good() != 1)
+        {
+            valid = false;
+            break;
+        }
+    }
+
+    return valid;
 }
 
 } // namespace updater

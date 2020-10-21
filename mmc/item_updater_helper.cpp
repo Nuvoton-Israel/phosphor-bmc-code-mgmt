@@ -1,4 +1,8 @@
+#include "config.h"
+
 #include "item_updater_helper.hpp"
+
+#include <thread>
 
 namespace phosphor
 {
@@ -27,14 +31,32 @@ void Helper::factoryReset()
     // Empty
 }
 
-void Helper::removeVersion(const std::string& /* versionId */)
+void Helper::removeVersion(const std::string& versionId)
 {
-    // Empty
+    auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
+                                      SYSTEMD_INTERFACE, "StartUnit");
+    auto serviceFile = "obmc-flash-mmc-remove@" + versionId + ".service";
+    method.append(serviceFile, "replace");
+    bus.call_noreply(method);
+
+    // Wait a few seconds for the service file to finish, otherwise the BMC may
+    // start the update while the image is still being deleted.
+    constexpr auto removeWait = std::chrono::seconds(3);
+    std::this_thread::sleep_for(removeWait);
 }
 
-void Helper::updateUbootVersionId(const std::string& /* versionId */)
+void Helper::updateUbootVersionId(const std::string& versionId)
 {
-    // Empty
+    auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
+                                      SYSTEMD_INTERFACE, "StartUnit");
+    auto serviceFile = "obmc-flash-mmc-setprimary@" + versionId + ".service";
+    method.append(serviceFile, "replace");
+    bus.call_noreply(method);
+
+    // Wait a few seconds for the service file to finish, otherwise the BMC may
+    // be rebooted while pointing to a non-existent version.
+    constexpr auto setPrimaryWait = std::chrono::seconds(3);
+    std::this_thread::sleep_for(setPrimaryWait);
 }
 
 void Helper::mirrorAlt()

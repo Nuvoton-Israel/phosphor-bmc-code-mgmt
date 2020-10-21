@@ -52,6 +52,7 @@ conf.set_quoted('MCU_FW_FILE', '/usr/share/phosphor-bmc-code-mgmt/mcu-release')
 # Supported BMC layout types
 conf.set('STATIC_LAYOUT', get_option('bmc-layout').contains('static'))
 conf.set('UBIFS_LAYOUT', get_option('bmc-layout').contains('ubi'))
+conf.set('MMC_LAYOUT', get_option('bmc-layout').contains('mmc'))
 
 # Configurable features
 conf.set('HOST_BIOS_UPGRADE', get_option('host-bios-upgrade').enabled())
@@ -63,11 +64,20 @@ conf.set_quoted('HASH_FILE_NAME', get_option('hash-file-name'))
 conf.set_quoted('IMG_UPLOAD_DIR', get_option('img-upload-dir'))
 conf.set_quoted('MANIFEST_FILE_NAME', get_option('manifest-file-name'))
 conf.set_quoted('MEDIA_DIR', get_option('media-dir'))
+optional_array = get_option('optional-images')
+optional_images = ''
+foreach optiona_image : optional_array
+    optional_images = ' '.join([optional_images, optiona_image])
+endforeach
+conf.set_quoted('OPTIONAL_IMAGES', optional_images)
 conf.set_quoted('PUBLICKEY_FILE_NAME', get_option('publickey-file-name'))
 conf.set_quoted('SIGNATURE_FILE_EXT', get_option('signature-file-ext'))
 conf.set_quoted('SIGNED_IMAGE_CONF_PATH', get_option('signed-image-conf-path'))
 conf.set_quoted('SYNC_LIST_DIR_PATH', get_option('sync-list-dir-path'))
 conf.set_quoted('SYNC_LIST_FILE_NAME', get_option('sync-list-file-name'))
+conf.set_quoted('BMC_MSL', get_option('bmc-msl'))
+conf.set_quoted('REGEX_BMC_MSL', get_option('regex-bmc-msl'))
+
 
 configure_file(output: 'config.h', configuration: conf)
 
@@ -83,15 +93,15 @@ systemd = dependency('systemd')
 systemd_system_unit_dir = systemd.get_pkgconfig_variable('systemdsystemunitdir')
 
 unit_files = [
-    'obmc-flash-bmc-setenv@.service',
-    'reboot-guard-disable.service',
-    'reboot-guard-enable.service',
-    'force-reboot.service',
-    'usr-local.mount',
-    'xyz.openbmc_project.Software.BMC.Updater.service',
-    'xyz.openbmc_project.Software.Download.service',
-    'xyz.openbmc_project.Software.Sync.service',
-    'xyz.openbmc_project.Software.Version.service'
+    'obmc-flash-bmc-setenv@.service.in',
+    'reboot-guard-disable.service.in',
+    'reboot-guard-enable.service.in',
+    'force-reboot.service.in',
+    'usr-local.mount.in',
+    'xyz.openbmc_project.Software.BMC.Updater.service.in',
+    'xyz.openbmc_project.Software.Download.service.in',
+    'xyz.openbmc_project.Software.Sync.service.in',
+    'xyz.openbmc_project.Software.Version.service.in'
 ]
 
 sdbuspp = find_program('sdbus++')
@@ -101,23 +111,53 @@ subdir('xyz/openbmc_project/Software/HostVer')
 image_updater_sources = files(
     'activation.cpp',
     'activation_mcu.cpp',
+    'images.cpp',
     'item_updater.cpp',
     'item_updater_main.cpp',
     'serialize.cpp',
     'version.cpp',
-    'utils.cpp'
+    'utils.cpp',
+    'msl_verify.cpp'
 )
 
 if get_option('bmc-layout').contains('static')
-    subdir('static')
+    image_updater_sources += files(
+        'static/flash.cpp',
+        'static/item_updater_helper.cpp'
+    )
 elif get_option('bmc-layout').contains('ubi')
-    subdir('ubi')
+    image_updater_sources += files(
+        'ubi/flash.cpp',
+        'ubi/item_updater_helper.cpp'
+    )
+
+    unit_files += [
+        'ubi/obmc-flash-bmc-cleanup.service.in',
+        'ubi/obmc-flash-bmc-mirroruboot.service.in',
+        'ubi/obmc-flash-bmc-ubiremount.service.in',
+        'ubi/obmc-flash-bmc-ubiro@.service.in',
+        'ubi/obmc-flash-bmc-ubiro-remove@.service.in',
+        'ubi/obmc-flash-bmc-ubirw.service.in',
+        'ubi/obmc-flash-bmc-ubirw-remove.service.in',
+        'ubi/obmc-flash-bmc-updateubootvars@.service.in'
+    ]
 elif get_option('bmc-layout').contains('mmc')
-    subdir('mmc')
+    image_updater_sources += files(
+        'mmc/flash.cpp',
+        'mmc/item_updater_helper.cpp'
+    )
+
+    unit_files += [
+        'mmc/obmc-flash-mmc@.service.in',
+        'mmc/obmc-flash-mmc-mount.service.in',
+        'mmc/obmc-flash-mmc-remove@.service.in',
+        'mmc/obmc-flash-mmc-setprimary@.service.in',
+        'mmc/obmc-flash-mmc-umount.service.in',
+    ]
 endif
 
 if get_option('host-bios-upgrade').enabled()
-    unit_files += 'obmc-flash-host-bios@.service'
+    unit_files += 'obmc-flash-host-bios@.service.in'
 endif
 
 if get_option('sync-bmc-files').enabled()
@@ -188,11 +228,11 @@ install_data('bios-release',
 
 foreach u : unit_files
     configure_file(
-        copy: true,
         input: u,
+        output: '@BASENAME@',
+        configuration: conf,
         install: true,
         install_dir: systemd_system_unit_dir,
-        output: u,
     )
 endforeach
 
@@ -218,6 +258,7 @@ if not build_tests.disabled()
     gtest = dependency('gtest', main: true, disabler: true, required: build_tests)
     include_srcs = declare_dependency(sources: [
         'image_verify.cpp',
+        'images.cpp',
         'version.cpp']
     )
 
