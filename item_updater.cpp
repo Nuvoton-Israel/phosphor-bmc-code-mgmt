@@ -223,6 +223,8 @@ void ItemUpdater::createHostVersion(const std::string& version)
     // Create an active association since this image is active
     createActiveAssociation(path);
 
+    createUpdateableAssociation(path);
+
     // Create Version instance for this version.
     auto versionPtr = std::make_unique<VersionClass>(
         bus, path, version, purpose, "",
@@ -289,6 +291,10 @@ void ItemUpdater::createMcuVersion(const std::string& version)
 
     // Create an active association since this image is active
     createActiveAssociation(path);
+
+    // All updateable firmware components must expose the updateable
+    // association.
+    createUpdateableAssociation(path);
 
     // Create Version instance for this version.
     auto versionPtr = std::make_unique<VersionClass>(

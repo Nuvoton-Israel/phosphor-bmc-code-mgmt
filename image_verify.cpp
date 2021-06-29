@@ -97,6 +97,8 @@ bool Signature::verifyFullImage()
         fs::path(imageDirPath) / "image-rofs.sig",
         fs::path(imageDirPath) / "image-rwfs.sig",
         fs::path(imageDirPath) / "image-u-boot.sig",
+        fs::path(imageDirPath) / "image-bios.sig",
+        fs::path(imageDirPath) / "image-mcu.sig",
         fs::path(imageDirPath) / "MANIFEST.sig",
         fs::path(imageDirPath) / "publickey.sig"};
 
